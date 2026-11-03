@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Dati di mercato scaricati (si rigenerano dalla cache, non vanno su Git)
+data/raw/
+data/cache/
+*.parquet
+
+# Database locale degli esperimenti
+*.sqlite
+*.db
+
+# Segreti (chiavi API): MAI su Git
+.env
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
