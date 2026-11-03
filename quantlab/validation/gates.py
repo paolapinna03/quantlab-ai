@@ -72,13 +72,16 @@ def validate_candidate(
     param_grid: list[dict] | None = None,
     criteria: Criteria = Criteria(),
     prices: pd.DataFrame | None = None,
+    ohlc: dict[str, pd.DataFrame] | None = None,
 ) -> ValidationReport:
     """Applica tutti i controlli a una strategia candidata.
 
     Il candidato viene eseguito e registrato (se è una configurazione nuova conta
     come tentativo). Il benchmark e gli stress test non vengono registrati.
     """
-    cand = run_experiment(spec, registry, prices=prices)
+    if prices is None and ohlc is not None:
+        prices = pd.DataFrame({t: d["close"] for t, d in ohlc.items()})
+    cand = run_experiment(spec, registry, prices=prices, ohlc=ohlc)
     start = str(cand.eval_start.date())
     bench = run_experiment(replace(benchmark, eval_start=start, eval_end=spec.eval_end),
                            prices=prices)
@@ -139,7 +142,7 @@ def validate_candidate(
     # 5. Costi realistici e pessimistici.
     stressed = run_experiment(
         replace(spec, cost_bps=spec.cost_bps * criteria.cost_multiplier, eval_start=start),
-        prices=prices,
+        prices=prices, ohlc=ohlc,
     )
     s_sharpe = float(stressed.metrics["sharpe"])
     checks.append(Check(

@@ -22,9 +22,10 @@ python -m quantlab.data SPY QQQ             # scarica e controlla i dati
 python examples/01_momentum_vs_buy_and_hold.py
 python examples/02_validate_momentum.py     # criteri di promozione
 python examples/03_swing_strategies.py      # swing trading: RSI(2) e Donchian
+python -m quantlab.discovery                # Strategy Discovery (60 candidate, ~1 min)
 python -m quantlab.experiments              # registro degli esperimenti
 python -m quantlab.experiments --reproduce <id>
-streamlit run app/streamlit_app.py          # dashboard (porta 8501)
+streamlit run app/streamlit_app.py          # dashboard: Backtesting + Strategy Discovery
 ```
 
 ## Principi

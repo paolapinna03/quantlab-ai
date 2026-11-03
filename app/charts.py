@@ -139,3 +139,46 @@ def walk_forward_chart(folds: pd.DataFrame, height: int = 230) -> go.Figure:
     fig.update_layout(hovermode="closest", bargap=0.35)
     fig.update_xaxes(showspikes=False, tickfont=dict(size=10))
     return fig
+
+
+def dumbbell_chart(labels: list[str], train: list[float], confirm: list[float],
+                   hovers: list[str], height: int = 260) -> go.Figure:
+    """Sharpe in training (scelto) contro Sharpe in conferma (mai visto): quanto si sgonfia."""
+    fig = go.Figure()
+    for lab, a, b in zip(labels, train, confirm):
+        fig.add_trace(go.Scatter(x=[a, b], y=[lab, lab], mode="lines",
+                                 line=dict(color="#3a3e45", width=2), showlegend=False,
+                                 hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=train, y=labels, mode="markers", name="Training (2005–2016)",
+                             marker=dict(color=TEXT_MUTED, size=10, line=dict(color=SURFACE, width=2)),
+                             customdata=hovers,
+                             hovertemplate="%{customdata}<br>Training: %{x:.2f}<extra></extra>"))
+    fig.add_trace(go.Scatter(x=confirm, y=labels, mode="markers", name="Conferma (2017–2022)",
+                             marker=dict(color=PALETTE[0], size=10, line=dict(color=SURFACE, width=2)),
+                             customdata=hovers,
+                             hovertemplate="%{customdata}<br>Conferma: %{x:.2f}<extra></extra>"))
+    fig.add_vline(x=0, line=dict(color="#3a3e45", width=1))
+    fig = _style(fig, height, ".1f")
+    fig.update_layout(hovermode="closest")
+    fig.update_xaxes(showgrid=True, gridcolor=GRID, showspikes=False, title=dict(
+        text="Sharpe ratio", font=dict(size=10, color=TEXT_MUTED)))
+    fig.update_yaxes(autorange="reversed", showgrid=False, side="left", tickformat="")
+    return fig
+
+
+def candidates_chart(sharpes: list[float], selected: list[bool], hovers: list[str],
+                     height: int = 230) -> go.Figure:
+    """Sharpe in training di tutte le candidate, ordinate; in evidenza quelle scelte."""
+    order = sorted(range(len(sharpes)), key=lambda i: sharpes[i], reverse=True)
+    colors = [PALETTE[0] if selected[i] else "#3a3e45" for i in order]
+    fig = go.Figure(go.Bar(
+        x=list(range(1, len(order) + 1)), y=[sharpes[i] for i in order],
+        marker=dict(color=colors, cornerradius=2), customdata=[hovers[i] for i in order],
+        hovertemplate="%{customdata}<br>Sharpe training %{y:.2f}<extra></extra>",
+    ))
+    fig.add_hline(y=0, line=dict(color="#3a3e45", width=1))
+    fig = _style(fig, height, ".1f", legend=False)
+    fig.update_layout(hovermode="closest", bargap=0.25)
+    fig.update_xaxes(showspikes=False, title=dict(text="candidate, dalla migliore alla peggiore",
+                                                  font=dict(size=10, color=TEXT_MUTED)))
+    return fig

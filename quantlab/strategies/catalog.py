@@ -15,6 +15,7 @@ import pandas as pd
 
 from quantlab.strategies.buy_and_hold import buy_and_hold
 from quantlab.strategies.momentum import time_series_momentum
+from quantlab.strategies.rules import rule_swing, rule_swing_warmup
 from quantlab.strategies.swing import WARMUP as SWING_WARMUP
 from quantlab.strategies.swing import donchian_breakout, rsi2_mean_reversion
 
@@ -30,6 +31,7 @@ PORTFOLIO_CATALOG: dict[str, Strategy] = {
 SWING_CATALOG: dict[str, Callable] = {
     "rsi2_mean_reversion": rsi2_mean_reversion,
     "donchian_breakout": donchian_breakout,
+    "rule_swing": rule_swing,
 }
 
 CATALOG: dict[str, Callable] = PORTFOLIO_CATALOG | SWING_CATALOG
@@ -49,7 +51,8 @@ def is_swing(name: str) -> bool:
 def warmup_days(name: str, params: dict) -> int:
     """Giorni di storia necessari prima che i segnali della strategia siano validi."""
     if is_swing(name):
-        return int(SWING_WARMUP[name](full_params(name, params)))
+        warm = SWING_WARMUP | {"rule_swing": rule_swing_warmup}
+        return int(warm[name](full_params(name, params)))
     return int(params.get("lookback", 0))
 
 

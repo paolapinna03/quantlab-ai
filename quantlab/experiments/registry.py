@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS runs (
     returns_blob  BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_runs_family ON runs(family);
+CREATE TABLE IF NOT EXISTS validations (
+    run_id        TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    family        TEXT NOT NULL,
+    verdict       TEXT NOT NULL,          -- 'PROMOSSA' | 'RESPINTA'
+    checks_json   TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS discoveries (
+    id            TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    config_json   TEXT NOT NULL
+);
 """
 
 
@@ -203,6 +216,44 @@ class ExperimentRegistry:
         latest = {r["config_hash"]: json.loads(r["metrics_json"]).get("sharpe") for r in rows}
         return [float(s) for s in latest.values() if s is not None]
 
+    def records(self, family: str) -> list[RunRecord]:
+        """Tutti i run di una famiglia, dal più vecchio al più recente."""
+        with closing(self._connect()) as con:
+            rows = con.execute(
+                "SELECT * FROM runs WHERE family = ? ORDER BY created_at, rowid", (family,)
+            ).fetchall()
+        return [_to_record(r) for r in rows]
+
+    # --- Verdetti e sessioni di discovery --------------------------------------
+
+    def log_validation(self, run_id: str, family: str, verdict: str, checks: list[dict]) -> None:
+        with closing(self._connect()) as con, con:
+            con.execute(
+                "INSERT OR REPLACE INTO validations VALUES (?,?,?,?,?)",
+                (run_id, _now(), family, verdict, json.dumps(checks, default=_json_default)),
+            )
+
+    def validations(self, family: str) -> dict[str, dict]:
+        """run_id → {"verdict": ..., "checks": [...]} per una famiglia."""
+        with closing(self._connect()) as con:
+            rows = con.execute("SELECT * FROM validations WHERE family = ?", (family,)).fetchall()
+        return {r["run_id"]: {"verdict": r["verdict"], "checks": json.loads(r["checks_json"])}
+                for r in rows}
+
+    def log_discovery(self, name: str, config: dict) -> str:
+        disc_id = uuid.uuid4().hex[:12]
+        with closing(self._connect()) as con, con:
+            con.execute("INSERT INTO discoveries VALUES (?,?,?,?)",
+                        (disc_id, _now(), name, json.dumps(config, default=_json_default)))
+        return disc_id
+
+    def discoveries(self) -> list[dict]:
+        """Sessioni di discovery, dalla più recente."""
+        with closing(self._connect()) as con:
+            rows = con.execute("SELECT * FROM discoveries ORDER BY created_at DESC, rowid DESC").fetchall()
+        return [{"id": r["id"], "created_at": r["created_at"], "name": r["name"],
+                 "config": json.loads(r["config_json"])} for r in rows]
+
     def families(self) -> list[str]:
         with closing(self._connect()) as con:
             rows = con.execute("SELECT DISTINCT family FROM runs ORDER BY family").fetchall()
@@ -219,6 +270,10 @@ class ExperimentRegistry:
                 f"la famiglia {family!r} ha già una valutazione finale (run {row['id']}). "
                 "Rifarla dopo aver visto il risultato trasformerebbe l'holdout in dati in-sample."
             )
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def _json_default(o):
