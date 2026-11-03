@@ -191,6 +191,18 @@ class ExperimentRegistry:
             ).fetchone()
         return int(row["n"])
 
+    def trial_sharpes(self, family: str) -> list[float]:
+        """Sharpe annualizzato dell'ultimo run completato di ogni configurazione distinta."""
+        with closing(self._connect()) as con:
+            rows = con.execute(
+                """SELECT config_hash, metrics_json FROM runs
+                   WHERE family = ? AND is_final = 0 AND status = 'completed'
+                   ORDER BY created_at, rowid""",
+                (family,),
+            ).fetchall()
+        latest = {r["config_hash"]: json.loads(r["metrics_json"]).get("sharpe") for r in rows}
+        return [float(s) for s in latest.values() if s is not None]
+
     def families(self) -> list[str]:
         with closing(self._connect()) as con:
             rows = con.execute("SELECT DISTINCT family FROM runs ORDER BY family").fetchall()

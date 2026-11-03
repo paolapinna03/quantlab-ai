@@ -20,6 +20,7 @@ pytest                                      # test offline (veloci)
 pytest -m network                           # test con dati reali
 python -m quantlab.data SPY QQQ             # scarica e controlla i dati
 python examples/01_momentum_vs_buy_and_hold.py
+python examples/02_validate_momentum.py     # criteri di promozione
 python -m quantlab.experiments              # registro degli esperimenti
 python -m quantlab.experiments --reproduce <id>
 streamlit run app/streamlit_app.py          # dashboard (porta 8501)
@@ -31,3 +32,5 @@ streamlit run app/streamlit_app.py          # dashboard (porta 8501)
 - Ogni esperimento viene registrato (`data/experiments.sqlite`), anche quelli falliti.
 - L'holdout (dal 2023) è bloccato dal codice e si usa una sola volta per famiglia.
 - I dati out-of-sample finali non si usano mai per ottimizzare.
+- Una strategia è promossa solo se supera tutti i criteri fissati in anticipo
+  (Deflated Sharpe, confronto con il benchmark, walk-forward, stabilità, costi, drawdown).
