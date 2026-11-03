@@ -18,10 +18,9 @@ from __future__ import annotations
 
 import pandas as pd
 
-from quantlab.backtest import BacktestConfig, run_backtest
+from quantlab.backtest import BacktestConfig, evaluate, run_backtest
 from quantlab.config import RESEARCH_END
 from quantlab.data import load_prices
-from quantlab.metrics import summarize
 from quantlab.strategies import buy_and_hold, time_series_momentum
 
 CONFIG = BacktestConfig()  # 5 bp per lato, esecuzione il giorno dopo
@@ -30,16 +29,6 @@ CONFIG = BacktestConfig()  # 5 bp per lato, esecuzione il giorno dopo
 def load_closes(tickers: list[str]) -> pd.DataFrame:
     closes = {t: load_prices(t, end=RESEARCH_END)["close"] for t in tickers}
     return pd.DataFrame(closes)
-
-
-def evaluate(result, start: str, end: str) -> pd.Series:
-    window = slice(start, end)
-    s = summarize(result.returns.loc[window])
-    years = s["periods"] / 252
-    s["turnover_yr"] = result.turnover.loc[window].sum() / years
-    s["cost_yr"] = result.costs.loc[window].sum() / years
-    s["invested"] = result.weights.loc[window].abs().sum(axis=1).mean()
-    return s
 
 
 def report(title: str, rows: dict[str, pd.Series]) -> None:

@@ -2,7 +2,7 @@
 
 Piattaforma di ricerca quantitativa assistita da AI per scoprire, testare e validare strategie di trading in modo rigoroso.
 
-> **Stato:** Fase 1 — ambiente di sviluppo. Solo ricerca e simulazione: nessun trading con denaro reale.
+> **Stato:** Fase 2 — dati, backtest e prima dashboard. Solo ricerca e simulazione: nessun trading con denaro reale.
 
 ## Avvio rapido (GitHub Codespaces)
 
@@ -12,6 +12,16 @@ Piattaforma di ricerca quantitativa assistita da AI per scoprire, testare e vali
    ```bash
    python -c "import pandas, yfinance, streamlit; print('OK')"
    ```
+
+## Comandi principali
+
+```bash
+pytest                                      # test offline (veloci)
+pytest -m network                           # test con dati reali
+python -m quantlab.data SPY QQQ             # scarica e controlla i dati
+python examples/01_momentum_vs_buy_and_hold.py
+streamlit run app/streamlit_app.py          # dashboard (porta 8501)
+```
 
 ## Principi
 
