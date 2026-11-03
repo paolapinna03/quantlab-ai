@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantlab"
+version = "0.1.0"
+description = "QuantLab AI: piattaforma di ricerca quantitativa"
+requires-python = ">=3.12"
+# Le dipendenze sono in requirements.txt (unica fonte di verità).
+
+[tool.setuptools.packages.find]
+include = ["quantlab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: test che scaricano dati reali da Internet (lenti, esclusi di default)",
+]
+addopts = "-m 'not network'"
