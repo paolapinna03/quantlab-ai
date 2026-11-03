@@ -11,6 +11,12 @@ import pytest
 APP = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
 
 
+@pytest.fixture(autouse=True)
+def temp_registry(tmp_path, monkeypatch):
+    """I test non devono scrivere nel registro reale degli esperimenti."""
+    monkeypatch.setenv("QUANTLAB_DB", str(tmp_path / "exp.sqlite"))
+
+
 @pytest.mark.network
 def test_dashboard_runs_without_errors():
     from streamlit.testing.v1 import AppTest

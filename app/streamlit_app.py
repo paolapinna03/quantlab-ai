@@ -14,11 +14,9 @@ import streamlit as st
 
 from charts import PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart, weights_chart
 from styles import CSS, card_title, esc, header, section
-from quantlab.backtest import BacktestConfig, evaluate, run_backtest, warmup_end
 from quantlab.config import DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
-from quantlab.data import load_prices
+from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.metrics import drawdown_series, equity_curve
-from quantlab.strategies import buy_and_hold, time_series_momentum
 
 # Universo di ETF liquidi disponibili nella dashboard.
 UNIVERSE = {
@@ -34,6 +32,11 @@ UNIVERSE = {
     "VNQ": "Immobiliare USA (REIT)",
 }
 LITERATURE_LOOKBACK = 252
+FAMILY = "tsmom_etf"
+HYPOTHESIS = (
+    "Il rendimento total-return degli ultimi 12 mesi di un ETF liquido predice "
+    "positivamente il suo rendimento del mese successivo (Moskowitz, Ooi & Pedersen, 2012)."
+)
 BENCH, EQUAL, MOM = "SPY buy & hold", "Pesi uguali", "Momentum"
 STRATEGIES = [BENCH, EQUAL, MOM]
 
@@ -43,26 +46,27 @@ st.html(CSS)
 
 # --- Dati e calcoli (in cache: si ricalcolano solo se cambiano gli input) ------
 
-@st.cache_data(show_spinner="Carico i prezzi…")
-def load_closes(tickers: tuple[str, ...]) -> pd.DataFrame:
-    # Si caricano solo dati fino a RESEARCH_END: l'holdout non entra mai in memoria.
-    return pd.DataFrame({t: load_prices(t, end=RESEARCH_END)["close"] for t in tickers})
-
-
 @st.cache_data(show_spinner="Eseguo i backtest…")
-def run_experiment(tickers: tuple[str, ...], lookback: int, long_only: bool,
-                   cost_bps: float, lag: int):
-    closes = load_closes(tickers)
-    spy = load_closes(("SPY",))
-    cfg = BacktestConfig(cost_bps=cost_bps, execution_lag=lag)
-    results = {
-        BENCH: run_backtest(spy, buy_and_hold(spy), cfg),
-        EQUAL: run_backtest(closes, buy_and_hold(closes, rebalance="M"), cfg),
-        MOM: run_backtest(
-            closes, time_series_momentum(closes, lookback=lookback, long_only=long_only), cfg
-        ),
-    }
-    return results, warmup_end(closes, lookback)
+def run_all(tickers: tuple[str, ...], lookback: int, long_only: bool, cost_bps: float, lag: int):
+    """Momentum (registrato come tentativo nella famiglia) + benchmark sulla stessa finestra.
+
+    La cache fa sì che ogni configurazione venga registrata una volta per sessione;
+    il conteggio dei tentativi usa comunque le configurazioni distinte.
+    """
+    common = dict(cost_bps=cost_bps, execution_lag=lag)
+    mom = run_experiment(
+        ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
+                       params={"lookback": lookback, "long_only": long_only},
+                       universe=tickers, hypothesis=HYPOTHESIS, **common),
+        ExperimentRegistry(),
+    )
+    start = str(mom.eval_start.date())
+    bench = run_experiment(ExperimentSpec(
+        family="benchmark", strategy="buy_and_hold", universe=("SPY",), eval_start=start, **common))
+    equal = run_experiment(ExperimentSpec(
+        family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
+        universe=tickers, eval_start=start, **common))
+    return {BENCH: bench, EQUAL: equal, MOM: mom}
 
 
 # --- Pannello parametri ----------------------------------------------------------
@@ -104,21 +108,24 @@ if not tickers:
     st.stop()
 
 try:
-    results, start = run_experiment(tuple(tickers), lookback, long_only, cost_bps, lag)
+    outcomes = run_all(tuple(tickers), lookback, long_only, cost_bps, lag)
 except Exception as exc:  # errori dei dati o del motore: mostrali, non nasconderli
     st.error(f"Impossibile eseguire il backtest: {exc}")
     st.stop()
 
-end = pd.Timestamp(RESEARCH_END)
+results = {name: o.result for name, o in outcomes.items()}
+start, end = outcomes[MOM].eval_start, outcomes[MOM].eval_end
 returns = {name: r.returns.loc[start:end] for name, r in results.items()}
-stats = pd.DataFrame({name: evaluate(r, start, end) for name, r in results.items()}).T
+stats = pd.DataFrame({name: o.metrics for name, o in outcomes.items()}).T
+trials = outcomes[MOM].trials_in_family
 colors = color_map(STRATEGIES)
 modified = lookback != LITERATURE_LOOKBACK or not long_only
 
 
 # --- Intestazione ------------------------------------------------------------
 
-badges = [(f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock"), ("In-sample", "")]
+badges = [(f"Tentativo {trials} · famiglia {FAMILY}", "warn" if trials > 1 else ""),
+          (f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock"), ("In-sample", "")]
 if modified:
     badges.insert(0, ("Parametri modificati", "warn"))
 st.html(header(
@@ -205,7 +212,9 @@ with st.container(border=True):
 
 # --- Dettagli -----------------------------------------------------------------
 
-tab_metrics, tab_trades, tab_method = st.tabs(["Tutte le metriche", "Operazioni", "Metodologia"])
+tab_metrics, tab_trades, tab_log, tab_method = st.tabs(
+    ["Tutte le metriche", "Operazioni", "Registro esperimenti", "Metodologia"]
+)
 
 with tab_metrics:
     PCT_COLS = ["cagr", "volatility", "max_drawdown", "cost_yr", "invested"]
@@ -238,6 +247,27 @@ with tab_trades:
             "weight_before": st.column_config.NumberColumn("Peso prima", format="percent"),
             "weight_after": st.column_config.NumberColumn("Peso dopo", format="percent"),
             "change": st.column_config.NumberColumn("Variazione", format="percent"),
+        },
+    )
+
+with tab_log:
+    st.caption(
+        f"Ogni configurazione del momentum che visualizzi viene registrata. La famiglia "
+        f"**{FAMILY}** conta **{trials}** configurazioni distinte: più varianti si provano, "
+        f"più è probabile che la migliore sembri buona per caso. "
+        f"Run attuale: `{outcomes[MOM].run_id}`."
+    )
+    log = ExperimentRegistry().runs(family=FAMILY, limit=200)
+    log[["cagr", "max_drawdown"]] = log[["cagr", "max_drawdown"]].astype(float) * 100
+    st.dataframe(
+        log.drop(columns=["family", "final"]), width="stretch", hide_index=True,
+        column_config={
+            "id": "Run", "created_at": "Data (UTC)", "strategy": None,
+            "params": "Parametri", "universe": "Universo", "status": "Stato",
+            "sharpe": st.column_config.NumberColumn("Sharpe", format="%.2f"),
+            "cagr": st.column_config.NumberColumn("CAGR", format="%.1f%%"),
+            "max_drawdown": st.column_config.NumberColumn("Max DD", format="%.1f%%"),
+            "commit": "Commit",
         },
     )
 

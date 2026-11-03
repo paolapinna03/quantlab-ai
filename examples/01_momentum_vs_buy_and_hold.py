@@ -5,10 +5,12 @@ Domanda: una regola di trend following a 12 mesi (Moskowitz, Ooi & Pedersen,
 al semplice buy-and-hold, al netto dei costi?
 
 Regole dell'esperimento:
-- solo dati fino al 2022-12-31: il periodo dal 2023 è l'holdout finale;
+- solo dati fino al 2022-12-31: il periodo dal 2023 è l'holdout finale
+  (il runner rifiuta qualsiasi tentativo di usarlo);
 - parametri fissati in anticipo dalla letteratura (lookback 12 mesi,
   ribilanciamento mensile), nessuna ottimizzazione;
-- stessa finestra di valutazione per strategia e benchmark.
+- stessa finestra di valutazione per strategia e benchmark;
+- ogni configurazione del momentum viene registrata nella famiglia "tsmom_etf".
 
 Esecuzione:
     python examples/01_momentum_vs_buy_and_hold.py
@@ -18,70 +20,56 @@ from __future__ import annotations
 
 import pandas as pd
 
-from quantlab.backtest import BacktestConfig, evaluate, run_backtest
-from quantlab.config import RESEARCH_END
-from quantlab.data import load_prices
-from quantlab.strategies import buy_and_hold, time_series_momentum
+from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 
-CONFIG = BacktestConfig()  # 5 bp per lato, esecuzione il giorno dopo
-
-
-def load_closes(tickers: list[str]) -> pd.DataFrame:
-    closes = {t: load_prices(t, end=RESEARCH_END)["close"] for t in tickers}
-    return pd.DataFrame(closes)
+FAMILY = "tsmom_etf"
+HYPOTHESIS = (
+    "Il rendimento total-return degli ultimi 12 mesi di un ETF liquido predice "
+    "positivamente il suo rendimento del mese successivo (Moskowitz, Ooi & Pedersen, 2012)."
+)
 
 
-def report(title: str, rows: dict[str, pd.Series]) -> None:
+def compare(title: str, universe: tuple[str, ...], registry: ExperimentRegistry) -> None:
+    # La strategia viene registrata: è un tentativo di verificare l'ipotesi.
+    mom = run_experiment(
+        ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
+                       params={"lookback": 252}, universe=universe, hypothesis=HYPOTHESIS),
+        registry,
+    )
+    start = str(mom.eval_start.date())
+    # I benchmark non sono ipotesi: non vengono registrati né contati come tentativi.
+    bench = {
+        "Buy & hold SPY": run_experiment(ExperimentSpec(
+            family="benchmark", strategy="buy_and_hold", universe=("SPY",), eval_start=start)),
+    }
+    if len(universe) > 1:
+        bench["Pesi uguali (ribil. mensile)"] = run_experiment(ExperimentSpec(
+            family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
+            universe=universe, eval_start=start))
+
+    rows = {name: o.metrics for name, o in bench.items()} | {"TSMOM 12m": mom.metrics}
     df = pd.DataFrame(rows).T
-    first = df.iloc[0]
     print(f"\n{title}")
-    print(f"Finestra di valutazione: {first['start'].date()} → {first['end'].date()} "
-          f"({first['periods']} giorni)\n")
-    table = pd.DataFrame({
+    print(f"Finestra: {mom.eval_start.date()} → {mom.eval_end.date()} · run {mom.run_id} · "
+          f"famiglia {FAMILY}: {mom.trials_in_family} configurazioni provate finora\n")
+    print(pd.DataFrame({
         "CAGR": df["cagr"].map("{:.1%}".format),
         "Vol": df["volatility"].map("{:.1%}".format),
         "Sharpe ± SE": [f"{s:.2f} ± {e:.2f}" for s, e in zip(df["sharpe"], df["sharpe_se"])],
-        "Sortino": df["sortino"].map("{:.2f}".format),
         "Max DD": df["max_drawdown"].map("{:.1%}".format),
-        "Calmar": df["calmar"].map("{:.2f}".format),
         "Turnover/anno": df["turnover_yr"].map("{:.2f}".format),
         "Costi/anno": df["cost_yr"].map("{:.2%}".format),
-        "Investito": df["invested"].map("{:.0%}".format),
-    })
-    print(table.to_string())
+    }).to_string())
 
 
 def main() -> None:
-    # A) Un solo asset: SPY. Il warm-up di 12 mesi finisce nel 1994.
-    spy = load_closes(["SPY"])
-    start, end = "1995-01-01", RESEARCH_END
-    report("A) SPY: momentum 12 mesi (lungo/liquidità) contro buy-and-hold", {
-        "Buy & hold SPY": evaluate(run_backtest(spy, buy_and_hold(spy), CONFIG), start, end),
-        "TSMOM 12m": evaluate(
-            run_backtest(spy, time_series_momentum(spy), CONFIG), start, end
-        ),
-    })
-
-    # B) Multi-asset: azioni USA, Nasdaq, Treasury lunghi, oro.
-    # GLD è quotato da fine 2004: warm-up fino a fine 2005.
-    tickers = ["SPY", "QQQ", "TLT", "GLD"]
-    multi = load_closes(tickers)
-    start = "2006-01-01"
-    report("B) SPY+QQQ+TLT+GLD: momentum contro pesi uguali", {
-        "Buy & hold SPY": evaluate(
-            run_backtest(multi[["SPY"]], buy_and_hold(multi[["SPY"]]), CONFIG), start, end
-        ),
-        "Pesi uguali (ribil. mensile)": evaluate(
-            run_backtest(multi, buy_and_hold(multi, rebalance="M"), CONFIG), start, end
-        ),
-        "TSMOM 12m": evaluate(
-            run_backtest(multi, time_series_momentum(multi), CONFIG), start, end
-        ),
-    })
-
+    registry = ExperimentRegistry()
+    compare("A) SPY: momentum 12 mesi contro buy-and-hold", ("SPY",), registry)
+    compare("B) SPY+QQQ+TLT+GLD: momentum contro pesi uguali", ("SPY", "QQQ", "TLT", "GLD"), registry)
     print(
         "\nNota: risultati storici in-sample, costi ipotizzati (5 bp per lato), "
         "liquidità a rendimento zero. Non sono una previsione di rendimenti futuri."
+        "\nRegistro: python -m quantlab.experiments"
     )
 
 
