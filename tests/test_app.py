@@ -17,8 +17,8 @@ def test_dashboard_runs_without_errors():
 
     at = AppTest.from_file(str(APP), default_timeout=120).run()
     assert not at.exception, at.exception
-    assert len(at.metric) == 4
-    assert at.metric[0].label == "CAGR momentum"
+    assert len(at.metric) == 5
+    assert at.metric[0].label == "CAGR"
 
 
 @pytest.mark.network

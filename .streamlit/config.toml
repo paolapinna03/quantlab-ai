@@ -4,9 +4,31 @@ headless = true
 [browser]
 gatherUsageStats = false
 
+[client]
+toolbarMode = "minimal"
+
+# Tema "terminale di ricerca": scuro neutro, bordi sottili, Inter per il testo.
+# La palette dei grafici è validata per il daltonismo su questo sfondo.
 [theme]
 base = "dark"
 primaryColor = "#3987e5"
-backgroundColor = "#1a1a19"
-secondaryBackgroundColor = "#242423"
-textColor = "#f0efec"
+backgroundColor = "#111214"
+secondaryBackgroundColor = "#17191c"
+textColor = "#e8e9eb"
+borderColor = "#26292e"
+dataframeBorderColor = "#26292e"
+dataframeHeaderBackgroundColor = "#17191c"
+showWidgetBorder = true
+showSidebarBorder = true
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 14
+baseRadius = "6px"
+metricValueFontSize = "1.65rem"
+greenColor = "#3fb68b"
+redColor = "#e66767"
+chartCategoricalColors = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+
+[theme.sidebar]
+backgroundColor = "#0c0d0f"
+secondaryBackgroundColor = "#17191c"

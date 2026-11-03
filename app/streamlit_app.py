@@ -12,7 +12,8 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from charts import color_map, drawdown_chart, equity_chart, weights_chart
+from charts import PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart, weights_chart
+from styles import CSS, card_title, esc, header, section
 from quantlab.backtest import BacktestConfig, evaluate, run_backtest, warmup_end
 from quantlab.config import DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
 from quantlab.data import load_prices
@@ -33,9 +34,11 @@ UNIVERSE = {
     "VNQ": "Immobiliare USA (REIT)",
 }
 LITERATURE_LOOKBACK = 252
-STRATEGIES = ["Buy & hold SPY", "Pesi uguali", "Momentum 12m"]
+BENCH, EQUAL, MOM = "SPY buy & hold", "Pesi uguali", "Momentum"
+STRATEGIES = [BENCH, EQUAL, MOM]
 
-st.set_page_config(page_title="QuantLab AI", page_icon="📈", layout="wide")
+st.set_page_config(page_title="QuantLab AI", page_icon="◆", layout="wide")
+st.html(CSS)
 
 
 # --- Dati e calcoli (in cache: si ricalcolano solo se cambiano gli input) ------
@@ -53,49 +56,51 @@ def run_experiment(tickers: tuple[str, ...], lookback: int, long_only: bool,
     spy = load_closes(("SPY",))
     cfg = BacktestConfig(cost_bps=cost_bps, execution_lag=lag)
     results = {
-        STRATEGIES[0]: run_backtest(spy, buy_and_hold(spy), cfg),
-        STRATEGIES[1]: run_backtest(closes, buy_and_hold(closes, rebalance="M"), cfg),
-        STRATEGIES[2]: run_backtest(
+        BENCH: run_backtest(spy, buy_and_hold(spy), cfg),
+        EQUAL: run_backtest(closes, buy_and_hold(closes, rebalance="M"), cfg),
+        MOM: run_backtest(
             closes, time_series_momentum(closes, lookback=lookback, long_only=long_only), cfg
         ),
     }
-    start = warmup_end(closes, lookback)
-    return results, start
+    return results, warmup_end(closes, lookback)
 
 
-# --- Barra laterale ------------------------------------------------------------
+# --- Pannello parametri ----------------------------------------------------------
 
 with st.sidebar:
-    st.markdown("## QuantLab AI")
-    st.caption("Backtesting · Fase 2")
+    st.html('<div class="ql-brand">QUANT<span>LAB</span> AI</div>'
+            '<div class="ql-sub">Piattaforma di ricerca quantitativa</div>')
 
+    st.html(section("Universo"))
     tickers = st.multiselect(
-        "Universo",
-        options=list(UNIVERSE),
-        default=["SPY", "QQQ", "TLT", "GLD"],
-        format_func=lambda t: f"{t} · {UNIVERSE[t]}",
-        max_selections=8,
+        "ETF", options=list(UNIVERSE), default=["SPY", "QQQ", "TLT", "GLD"],
+        format_func=lambda t: f"{t} · {UNIVERSE[t]}", max_selections=8,
+        label_visibility="collapsed",
     )
-    st.markdown("**Momentum**")
+
+    st.html(section("Segnale momentum"))
     lookback = st.select_slider(
-        "Finestra del segnale",
-        options=[63, 126, 189, 252, 378],
-        value=LITERATURE_LOOKBACK,
+        "Finestra", options=[63, 126, 189, 252, 378], value=LITERATURE_LOOKBACK,
         format_func=lambda d: f"{d // 21} mesi",
     )
-    long_only = st.toggle("Solo lungo (altrimenti lungo/corto)", value=True)
+    direction = st.segmented_control(
+        "Posizioni", ["Lungo / liquidità", "Lungo / corto"], default="Lungo / liquidità",
+    )
+    long_only = direction != "Lungo / corto"
 
-    st.markdown("**Esecuzione**")
+    st.html(section("Esecuzione"))
     cost_bps = st.number_input("Costi per lato (bp)", 0.0, 100.0, DEFAULT_COST_BPS, 1.0)
-    lag = st.radio("Esecuzione", [1, 0, 2], horizontal=True,
-                   format_func=lambda x: {0: "stessa chiusura", 1: "+1 giorno", 2: "+2 giorni"}[x])
+    lag = st.segmented_control(
+        "Esecuzione dell'ordine", [0, 1, 2], default=1,
+        format_func=lambda x: {0: "Stessa chiusura", 1: "t+1", 2: "t+2"}[x],
+    )
+    lag = 1 if lag is None else lag
+
+    st.html(section("Visualizzazione"))
     log_scale = st.toggle("Scala logaritmica", value=True)
 
-    st.divider()
-    st.caption(f"🔒 Holdout dal {HOLDOUT_START}: escluso da tutte le analisi.")
-
 if not tickers:
-    st.info("Scegli almeno un ETF nella barra laterale.")
+    st.info("Scegli almeno un ETF nel pannello a sinistra.")
     st.stop()
 
 try:
@@ -108,95 +113,132 @@ end = pd.Timestamp(RESEARCH_END)
 returns = {name: r.returns.loc[start:end] for name, r in results.items()}
 stats = pd.DataFrame({name: evaluate(r, start, end) for name, r in results.items()}).T
 colors = color_map(STRATEGIES)
+modified = lookback != LITERATURE_LOOKBACK or not long_only
 
 
 # --- Intestazione ------------------------------------------------------------
 
-st.markdown("### Momentum contro buy-and-hold")
-st.caption(
-    f"Finestra di valutazione {start.date()} → {end.date()} · universo {', '.join(tickers)} · "
-    f"costi {cost_bps:g} bp per lato · stessa finestra per tutte le strategie"
-)
+badges = [(f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock"), ("In-sample", "")]
+if modified:
+    badges.insert(0, ("Parametri modificati", "warn"))
+st.html(header(
+    eyebrow="Backtesting · Esperimento 01",
+    title="Time-series momentum contro buy-and-hold",
+    meta=(f"<b>{start:%d %b %Y} → {end:%d %b %Y}</b> · {esc(', '.join(tickers))} · "
+          f"costi <b>{cost_bps:g} bp</b> per lato · esecuzione <b>"
+          f"{ {0: 'stessa chiusura', 1: 't+1', 2: 't+2'}[lag] }</b>"),
+    badges=badges,
+))
 
-if lookback != LITERATURE_LOOKBACK or not long_only:
+if modified:
     st.warning(
-        "Hai cambiato i parametri rispetto alla configurazione di riferimento. "
-        "Ogni variante provata dopo aver visto i risultati aumenta il rischio di "
-        "overfitting: considera questi numeri esplorativi, non una scoperta.",
-        icon="⚠️",
+        "Parametri diversi dalla configurazione della letteratura (12 mesi, lungo/liquidità). "
+        "Ogni variante provata dopo aver visto i risultati aumenta il rischio di overfitting: "
+        "considera questi numeri esplorativi.",
+        icon=":material/warning:",
     )
 
-mom, bench = stats.loc[STRATEGIES[2]], stats.loc[STRATEGIES[0]]
-k1, k2, k3, k4 = st.columns(4)
+
+# --- KPI ---------------------------------------------------------------------
+
 def pp(x: float) -> str:
-    """Differenza tra due percentuali, in punti percentuali."""
     return f"{x * 100:+.1f} pp vs SPY"
 
 
-k1.metric("CAGR momentum", f"{mom['cagr']:.1%}", pp(mom["cagr"] - bench["cagr"]))
-k2.metric(f"Sharpe momentum (± {mom['sharpe_se']:.2f})", f"{mom['sharpe']:.2f}",
-          f"{mom['sharpe'] - bench['sharpe']:+.2f} vs SPY",
-          help="± = errore standard (Lo, 2002). Differenze inferiori a ~2 SE "
-               "non sono statisticamente distinguibili.")
-k3.metric("Max drawdown", f"{mom['max_drawdown']:.1%}",
-          pp(mom["max_drawdown"] - bench["max_drawdown"]))
-k4.metric("Volatilità", f"{mom['volatility']:.1%}",
-          pp(mom["volatility"] - bench["volatility"]), delta_color="inverse")
+mom, bench = stats.loc[MOM], stats.loc[BENCH]
+k = st.columns(5)
+k[0].metric("CAGR", f"{mom['cagr']:.2%}", pp(mom["cagr"] - bench["cagr"]), border=True)
+k[1].metric(f"Sharpe ± {mom['sharpe_se']:.2f}", f"{mom['sharpe']:.2f}",
+            f"{mom['sharpe'] - bench['sharpe']:+.2f} vs SPY", border=True,
+            help="± = errore standard (Lo, 2002). Differenze inferiori a circa 2 errori "
+                 "standard non sono statisticamente distinguibili.")
+k[2].metric("Max drawdown", f"{mom['max_drawdown']:.1%}",
+            pp(mom["max_drawdown"] - bench["max_drawdown"]), border=True)
+k[3].metric("Volatilità", f"{mom['volatility']:.1%}",
+            pp(mom["volatility"] - bench["volatility"]), delta_color="inverse", border=True)
+k[4].metric("Turnover / anno", f"{mom['turnover_yr']:.2f}×",
+            f"costi {mom['cost_yr']:.2%} / anno", delta_color="off", border=True)
 
 
-# --- Schede -------------------------------------------------------------------
+# --- Equity + classifica -------------------------------------------------------
 
-tab_perf, tab_table, tab_weights, tab_trades, tab_method = st.tabs(
-    ["Performance", "Metriche", "Pesi", "Operazioni", "Metodologia"]
-)
+left, right = st.columns([2.3, 1], gap="medium")
 
-with tab_perf:
-    st.markdown("**Valore di 100 investito**")
+with left, st.container(border=True):
+    st.html(card_title("Valore di 100 investito", "scala log" if log_scale else "scala lineare"))
     curves = {n: equity_curve(r, start_value=100) for n, r in returns.items()}
-    st.plotly_chart(equity_chart(curves, colors, log_scale), use_container_width=True)
-    st.markdown("**Drawdown** · distanza dal massimo precedente")
-    dds = {n: drawdown_series(r) for n, r in returns.items()}
-    st.plotly_chart(drawdown_chart(dds, colors), use_container_width=True)
+    st.plotly_chart(equity_chart(curves, colors, log_scale), config=PLOTLY_CONFIG, width="stretch")
 
-with tab_table:
-    table = pd.DataFrame({
-        "CAGR": stats["cagr"].map("{:.1%}".format),
-        "Volatilità": stats["volatility"].map("{:.1%}".format),
-        "Sharpe": stats["sharpe"].map("{:.2f}".format),
-        "± SE": stats["sharpe_se"].map("{:.2f}".format),
-        "Sortino": stats["sortino"].map("{:.2f}".format),
-        "Max DD": stats["max_drawdown"].map("{:.1%}".format),
-        "Durata max DD (gg)": stats["max_dd_duration"].astype(int),
-        "Calmar": stats["calmar"].map("{:.2f}".format),
-        "Turnover/anno": stats["turnover_yr"].map("{:.2f}".format),
-        "Costi/anno": stats["cost_yr"].map("{:.2%}".format),
-        "Investito": stats["invested"].map("{:.0%}".format),
-    })
-    st.dataframe(table, use_container_width=True)
-    st.caption(
-        "SE = errore standard dello Sharpe (Lo, 2002). Differenze di Sharpe più piccole "
-        "di circa 2 × SE non sono statisticamente distinguibili. Sharpe calcolato con "
-        "tasso privo di rischio a zero."
+with right, st.container(border=True):
+    st.html(card_title("Confronto strategie", "ordinate per Sharpe"))
+    rows = "".join(
+        f"""<tr>
+          <td><span class="ql-dot" style="background:{colors[name]}"></span>{esc(name)}</td>
+          <td>{s['sharpe']:.2f} <span class="se">±{s['sharpe_se']:.2f}</span></td>
+          <td>{s['cagr']:.1%}</td>
+          <td>{s['max_drawdown']:.1%}</td>
+        </tr>"""
+        for name, s in stats.sort_values("sharpe", ascending=False).iterrows()
+    )
+    st.html(f"""
+      <table class="ql-table">
+        <thead><tr><th>Strategia</th><th>Sharpe</th><th>CAGR</th><th>Max DD</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+      <div class="ql-note">Stessa finestra per tutte le strategie, al netto dei costi.
+      Differenze di Sharpe inferiori a ~2 errori standard non sono significative.
+      Tasso privo di rischio posto a zero.</div>""")
+
+    st.html(card_title("Esposizione momentum", "vuoto = liquidità"))
+    w = results[MOM].weights.loc[start:end]
+    st.plotly_chart(weights_chart(w, color_map(tickers), height=215),
+                    config=PLOTLY_CONFIG, width="stretch")
+
+
+# --- Drawdown -----------------------------------------------------------------
+
+with st.container(border=True):
+    st.html(card_title("Drawdown", "distanza dal massimo precedente"))
+    dds = {n: drawdown_series(r) for n, r in returns.items()}
+    st.plotly_chart(drawdown_chart(dds, colors), config=PLOTLY_CONFIG, width="stretch")
+
+
+# --- Dettagli -----------------------------------------------------------------
+
+tab_metrics, tab_trades, tab_method = st.tabs(["Tutte le metriche", "Operazioni", "Metodologia"])
+
+with tab_metrics:
+    PCT_COLS = ["cagr", "volatility", "max_drawdown", "cost_yr", "invested"]
+    table = stats[["cagr", "volatility", "sharpe", "sharpe_se", "sortino", "max_drawdown",
+                   "max_dd_duration", "calmar", "turnover_yr", "cost_yr", "invested"]].astype(float)
+    table[PCT_COLS] = table[PCT_COLS] * 100  # in punti percentuali per un formato uniforme
+    pct = lambda label, digits=1: st.column_config.NumberColumn(label, format=f"%.{digits}f%%")
+    num = lambda label, fmt="%.2f": st.column_config.NumberColumn(label, format=fmt)
+    st.dataframe(
+        table, width="stretch",
+        column_config={
+            "cagr": pct("CAGR"), "volatility": pct("Volatilità"),
+            "sharpe": num("Sharpe"), "sharpe_se": num("± SE"), "sortino": num("Sortino"),
+            "max_drawdown": pct("Max DD"), "max_dd_duration": num("Durata max DD (gg)", "%d"),
+            "calmar": num("Calmar"), "turnover_yr": num("Turnover/anno"),
+            "cost_yr": pct("Costi/anno", 3), "invested": pct("Investito", 0),
+        },
     )
 
-with tab_weights:
-    # Colori nell'ordine validato della palette (coppie adiacenti distinguibili
-    # anche per chi è daltonico), assegnati agli ETF selezionati.
-    asset_colors = color_map(tickers)
-    w = results[STRATEGIES[2]].weights.loc[start:end]
-    st.markdown("**Pesi del momentum** · lo spazio vuoto sopra le aree è liquidità")
-    st.plotly_chart(weights_chart(w, asset_colors), use_container_width=True)
-
 with tab_trades:
-    trades = results[STRATEGIES[2]].trades
+    trades = results[MOM].trades
     trades = trades[(trades["date"] >= start) & (trades["date"] <= end)]
-    st.markdown(f"**Operazioni del momentum** · {len(trades)} variazioni di peso")
+    st.caption(f"{len(trades)} variazioni di peso del momentum nella finestra di valutazione")
     st.dataframe(
-        trades.sort_values("date", ascending=False).style.format({
-            "date": lambda d: d.date(), "weight_before": "{:.1%}",
-            "weight_after": "{:.1%}", "change": "{:+.1%}",
-        }),
-        use_container_width=True, hide_index=True,
+        trades.sort_values("date", ascending=False),
+        width="stretch", hide_index=True,
+        column_config={
+            "date": st.column_config.DateColumn("Data", format="YYYY-MM-DD"),
+            "asset": "ETF",
+            "weight_before": st.column_config.NumberColumn("Peso prima", format="percent"),
+            "weight_after": st.column_config.NumberColumn("Peso dopo", format="percent"),
+            "change": st.column_config.NumberColumn("Variazione", format="percent"),
+        },
     )
 
 with tab_method:
