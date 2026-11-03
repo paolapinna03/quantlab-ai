@@ -21,7 +21,8 @@ from quantlab.config import HOLDOUT_START
 from quantlab.data import cache_info, load_prices
 from quantlab.experiments.registry import ExperimentRegistry
 from quantlab.experiments.spec import ExperimentSpec
-from quantlab.strategies.catalog import check_params, get_strategy
+from quantlab.strategies.catalog import check_params, get_strategy, is_swing, warmup_days
+from quantlab.swing import SwingConfig, run_swing_backtest, trade_stats
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,8 +46,13 @@ def run_experiment(
     spec: ExperimentSpec,
     registry: ExperimentRegistry | None = None,
     prices: pd.DataFrame | None = None,
+    ohlc: dict[str, pd.DataFrame] | None = None,
 ) -> ExperimentOutcome:
-    """Esegue `spec`. Con `registry` il run viene salvato; `prices` serve ai test."""
+    """Esegue `spec`. Con `registry` il run viene salvato.
+
+    `prices` (chiusure) e `ohlc` (dati completi per le strategie swing) servono ai test:
+    se mancano, i dati vengono caricati fino a `eval_end`.
+    """
     _validate(spec)
     if spec.final_evaluation and registry is not None:
         registry.check_final_allowed(spec.family)
@@ -54,18 +60,31 @@ def run_experiment(
     code = git_version()
     data_info: dict = {}
     try:
-        if prices is None:
-            prices = load_closes(spec.universe, end=spec.eval_end)
-        prices = prices.loc[: spec.eval_end, list(spec.universe)]
-        data_info = data_fingerprint(prices)
-
-        targets = get_strategy(spec.strategy)(prices, **spec.params)
-        cfg = BacktestConfig(cost_bps=spec.cost_bps, execution_lag=spec.execution_lag)
-        result = run_backtest(prices, targets, cfg)
+        if is_swing(spec.strategy):
+            if ohlc is None:
+                ohlc = {t: load_prices(t, end=spec.eval_end) for t in spec.universe}
+            data = {t: ohlc[t].loc[: spec.eval_end] for t in spec.universe}
+            prices = pd.DataFrame({t: d["close"] for t, d in data.items()})
+            data_info = data_fingerprint(prices)
+            signals = get_strategy(spec.strategy)(data, **spec.params)
+            result = run_swing_backtest(data, signals,
+                                        SwingConfig(cost_bps=spec.cost_bps, **spec.engine))
+        else:
+            if prices is None:
+                prices = load_closes(spec.universe, end=spec.eval_end)
+            prices = prices.loc[: spec.eval_end, list(spec.universe)]
+            data_info = data_fingerprint(prices)
+            targets = get_strategy(spec.strategy)(prices, **spec.params)
+            cfg = BacktestConfig(cost_bps=spec.cost_bps, execution_lag=spec.execution_lag)
+            result = run_backtest(prices, targets, cfg)
 
         start = pd.Timestamp(spec.eval_start) if spec.eval_start else _default_start(spec, prices)
         end = min(pd.Timestamp(spec.eval_end), prices.index[-1])
         metrics = evaluate(result, start, end)
+        if is_swing(spec.strategy):
+            t = result.trades
+            in_window = t[(t["entry_date"] >= start) & (t["exit_date"] <= end)]
+            metrics = pd.concat([metrics, trade_stats(in_window).add_prefix("trade_")])
     except Exception as exc:
         if registry is not None:
             registry.log(spec, status="failed", error=f"{type(exc).__name__}: {exc}",
@@ -85,6 +104,15 @@ def run_experiment(
 
 def _validate(spec: ExperimentSpec) -> None:
     check_params(spec.strategy, spec.params)
+    if is_swing(spec.strategy):
+        if spec.execution_lag != 1:
+            raise ValueError("le strategie swing eseguono sempre all'apertura del giorno dopo")
+        try:
+            SwingConfig(**spec.engine)
+        except TypeError as exc:
+            raise ValueError(f"parametri del motore swing non validi: {exc}") from None
+    elif spec.engine:
+        raise ValueError("il campo engine vale solo per le strategie swing")
     holdout = pd.Timestamp(HOLDOUT_START)
     if not spec.final_evaluation and pd.Timestamp(spec.eval_end) >= holdout:
         raise HoldoutViolation(
@@ -99,8 +127,7 @@ def _validate(spec: ExperimentSpec) -> None:
 
 
 def _default_start(spec: ExperimentSpec, prices: pd.DataFrame) -> pd.Timestamp:
-    lookback = int(spec.params.get("lookback", 0))
-    return warmup_end(prices, lookback)
+    return warmup_end(prices, warmup_days(spec.strategy, spec.params))
 
 
 def load_closes(tickers: tuple[str, ...], end: str) -> pd.DataFrame:

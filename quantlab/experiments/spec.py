@@ -30,6 +30,7 @@ class ExperimentSpec:
     execution_lag: int = 1
     hypothesis: str = ""
     final_evaluation: bool = False     # True solo per la valutazione sull'holdout
+    engine: dict = field(default_factory=dict)  # solo swing: max_positions, sizing, stop a tempo…
 
     def __post_init__(self):
         if not self.family.strip():
@@ -47,12 +48,19 @@ class ExperimentSpec:
         Normalizza ciò che non cambia il risultato: testo dell'ipotesi escluso,
         parametri completati con i default, ordine dei ticker ignorato.
         """
-        from quantlab.strategies.catalog import CATALOG, full_params
+        from quantlab.strategies.catalog import CATALOG, SWING_CATALOG, full_params
 
         d = self.to_dict()
         d.pop("hypothesis")
         if self.strategy in CATALOG:
             d["params"] = full_params(self.strategy, self.params)
+        if self.strategy in SWING_CATALOG:
+            from dataclasses import asdict as _asdict
+
+            from quantlab.swing import SwingConfig
+            d["engine"] = _asdict(SwingConfig(**self.engine)) | {"cost_bps": None}
+        elif not self.engine:
+            d.pop("engine")  # i run di portafoglio registrati prima del campo restano identici
         d["universe"] = sorted(d["universe"])
         d["cost_bps"] = float(d["cost_bps"])
         payload = json.dumps(d, sort_keys=True, default=str)

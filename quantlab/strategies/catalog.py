@@ -15,20 +15,47 @@ import pandas as pd
 
 from quantlab.strategies.buy_and_hold import buy_and_hold
 from quantlab.strategies.momentum import time_series_momentum
+from quantlab.strategies.swing import WARMUP as SWING_WARMUP
+from quantlab.strategies.swing import donchian_breakout, rsi2_mean_reversion
 
 Strategy = Callable[..., pd.DataFrame]
 
-CATALOG: dict[str, Strategy] = {
+# Strategie di portafoglio: prezzi di chiusura → pesi target (motore quantlab.backtest).
+PORTFOLIO_CATALOG: dict[str, Strategy] = {
     "buy_and_hold": buy_and_hold,
     "time_series_momentum": time_series_momentum,
 }
 
+# Strategie swing: dati OHLC → segnali di ingresso/uscita (motore quantlab.swing).
+SWING_CATALOG: dict[str, Callable] = {
+    "rsi2_mean_reversion": rsi2_mean_reversion,
+    "donchian_breakout": donchian_breakout,
+}
 
-def get_strategy(name: str) -> Strategy:
+CATALOG: dict[str, Callable] = PORTFOLIO_CATALOG | SWING_CATALOG
+
+
+def get_strategy(name: str) -> Callable:
     try:
         return CATALOG[name]
     except KeyError:
         raise ValueError(f"strategia sconosciuta: {name!r}. Disponibili: {sorted(CATALOG)}") from None
+
+
+def is_swing(name: str) -> bool:
+    return name in SWING_CATALOG
+
+
+def warmup_days(name: str, params: dict) -> int:
+    """Giorni di storia necessari prima che i segnali della strategia siano validi."""
+    if is_swing(name):
+        return int(SWING_WARMUP[name](full_params(name, params)))
+    return int(params.get("lookback", 0))
+
+
+def _strategy_params(name: str) -> list[inspect.Parameter]:
+    """Parametri configurabili: tutti tranne il primo (i dati)."""
+    return list(inspect.signature(get_strategy(name)).parameters.values())[1:]
 
 
 def full_params(name: str, params: dict) -> dict:
@@ -37,18 +64,16 @@ def full_params(name: str, params: dict) -> dict:
     Così {"lookback": 252} e {"lookback": 252, "long_only": True} risultano
     la stessa configurazione (e lo stesso tentativo).
     """
-    sig = inspect.signature(get_strategy(name))
     defaults = {
-        p.name: p.default for p in sig.parameters.values()
-        if p.name != "prices" and p.default is not inspect.Parameter.empty
+        p.name: p.default for p in _strategy_params(name)
+        if p.default is not inspect.Parameter.empty
     }
     return defaults | dict(params)
 
 
 def check_params(name: str, params: dict) -> None:
     """Verifica che i parametri esistano nella firma della strategia."""
-    sig = inspect.signature(get_strategy(name))
-    allowed = [p for p in sig.parameters if p != "prices"]
+    allowed = [p.name for p in _strategy_params(name)]
     unknown = set(params) - set(allowed)
     if unknown:
         raise ValueError(f"parametri non validi per {name}: {sorted(unknown)}. Ammessi: {allowed}")
