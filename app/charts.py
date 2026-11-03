@@ -123,3 +123,19 @@ def weights_chart(weights: pd.DataFrame, colors: dict[str, str], height: int = 2
     fig.update_yaxes(range=[0, 1.0], dtick=0.25)
     fig.update_xaxes(range=[weights.index[0], weights.index[-1]])
     return fig
+
+
+def walk_forward_chart(folds: pd.DataFrame, height: int = 230) -> go.Figure:
+    """Sharpe di ogni anno di test, con il lookback scelto usando solo gli anni precedenti."""
+    years = [str(pd.Timestamp(d).year) for d in folds["test_start"]]
+    months = [f"{p.get('lookback', 0) // 21}m" for p in folds["params"]]
+    fig = go.Figure(go.Bar(
+        x=years, y=folds["test_sharpe_chosen"], marker=dict(color=PALETTE[0], cornerradius=3),
+        customdata=months,
+        hovertemplate="Anno %{x}<br>Lookback %{customdata}<br>Sharpe %{y:.2f}<extra></extra>",
+    ))
+    fig.add_hline(y=0, line=dict(color="#3a3e45", width=1))
+    fig = _style(fig, height, ".1f", legend=False)
+    fig.update_layout(hovermode="closest", bargap=0.35)
+    fig.update_xaxes(showspikes=False, tickfont=dict(size=10))
+    return fig

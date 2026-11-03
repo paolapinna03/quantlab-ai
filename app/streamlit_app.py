@@ -12,11 +12,14 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
-from charts import PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart, weights_chart
-from styles import CSS, card_title, esc, header, section
+from charts import (
+    PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart, walk_forward_chart, weights_chart,
+)
+from styles import CSS, card_title, criteria_table, esc, header, section, verdict_block
 from quantlab.config import DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.metrics import drawdown_series, equity_curve
+from quantlab.validation import Criteria, validate_candidate
 
 # Universo di ETF liquidi disponibili nella dashboard.
 UNIVERSE = {
@@ -54,19 +57,39 @@ def run_all(tickers: tuple[str, ...], lookback: int, long_only: bool, cost_bps: 
     il conteggio dei tentativi usa comunque le configurazioni distinte.
     """
     common = dict(cost_bps=cost_bps, execution_lag=lag)
-    mom = run_experiment(
-        ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
-                       params={"lookback": lookback, "long_only": long_only},
-                       universe=tickers, hypothesis=HYPOTHESIS, **common),
-        ExperimentRegistry(),
-    )
+    mom = run_experiment(momentum_spec(tickers, lookback, long_only, cost_bps, lag),
+                         ExperimentRegistry())
     start = str(mom.eval_start.date())
     bench = run_experiment(ExperimentSpec(
         family="benchmark", strategy="buy_and_hold", universe=("SPY",), eval_start=start, **common))
-    equal = run_experiment(ExperimentSpec(
-        family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
-        universe=tickers, eval_start=start, **common))
+    equal = run_experiment(equal_weight_spec(tickers, cost_bps, lag, eval_start=start))
     return {BENCH: bench, EQUAL: equal, MOM: mom}
+
+
+@st.cache_data(show_spinner="Verifico i criteri di promozione…")
+def run_validation(tickers: tuple[str, ...], lookback: int, long_only: bool, cost_bps: float,
+                   lag: int, trials: int):
+    """Criteri di promozione. `trials` è nella chiave della cache: quando provi nuove
+    configurazioni la soglia del Deflated Sharpe sale e la validazione va rifatta."""
+    grid = [{"lookback": lb, "long_only": long_only} for lb in (63, 126, 189, 252, 378)]
+    return validate_candidate(
+        momentum_spec(tickers, lookback, long_only, cost_bps, lag),
+        equal_weight_spec(tickers, cost_bps, lag),
+        ExperimentRegistry(), grid, Criteria(),
+    )
+
+
+def momentum_spec(tickers, lookback, long_only, cost_bps, lag) -> ExperimentSpec:
+    return ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
+                          params={"lookback": lookback, "long_only": long_only},
+                          universe=tickers, hypothesis=HYPOTHESIS,
+                          cost_bps=cost_bps, execution_lag=lag)
+
+
+def equal_weight_spec(tickers, cost_bps, lag, eval_start=None) -> ExperimentSpec:
+    return ExperimentSpec(family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
+                          universe=tickers, eval_start=eval_start,
+                          cost_bps=cost_bps, execution_lag=lag)
 
 
 # --- Pannello parametri ----------------------------------------------------------
@@ -118,6 +141,11 @@ start, end = outcomes[MOM].eval_start, outcomes[MOM].eval_end
 returns = {name: r.returns.loc[start:end] for name, r in results.items()}
 stats = pd.DataFrame({name: o.metrics for name, o in outcomes.items()}).T
 trials = outcomes[MOM].trials_in_family
+try:
+    report = run_validation(tuple(tickers), lookback, long_only, cost_bps, lag, trials)
+except Exception as exc:  # la validazione non deve nascondere i risultati del backtest
+    report = None
+    validation_error = str(exc)
 colors = color_map(STRATEGIES)
 modified = lookback != LITERATURE_LOOKBACK or not long_only
 
@@ -128,6 +156,9 @@ badges = [(f"Tentativo {trials} · famiglia {FAMILY}", "warn" if trials > 1 else
           (f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock"), ("In-sample", "")]
 if modified:
     badges.insert(0, ("Parametri modificati", "warn"))
+if report is not None:
+    badges.insert(0, (f"{'✓' if report.promoted else '✗'} {report.verdict}",
+                      "pass" if report.promoted else "fail"))
 st.html(header(
     eyebrow="Backtesting · Esperimento 01",
     title="Time-series momentum contro buy-and-hold",
@@ -200,6 +231,35 @@ with right, st.container(border=True):
     w = results[MOM].weights.loc[start:end]
     st.plotly_chart(weights_chart(w, color_map(tickers), height=215),
                     config=PLOTLY_CONFIG, width="stretch")
+
+
+# --- Validazione --------------------------------------------------------------
+
+v_left, v_right = st.columns([2.3, 1], gap="medium")
+if report is None:
+    st.error(f"Validazione non disponibile: {validation_error}")
+else:
+    passed = sum(c.passed for c in report.checks)
+    with v_left, st.container(border=True):
+        st.html(card_title("Criteri di promozione",
+                           "fissati prima di vedere i risultati · benchmark: pesi uguali"))
+        st.html(criteria_table(report.checks))
+    with v_right, st.container(border=True):
+        st.html(card_title("Verdetto", f"{passed}/{len(report.checks)} criteri superati"))
+        failed = [c.name for c in report.checks if not c.passed]
+        st.html(verdict_block(
+            report.promoted,
+            "Supera tutti i criteri: può passare alla valutazione sull'holdout."
+            if report.promoted else
+            f"Non supera: {', '.join(failed)}. Le soglie non si abbassano dopo aver visto "
+            "l'esito: si torna alle ipotesi.",
+        ))
+        wf = report.details.get("walk_forward")
+        if wf is not None:
+            st.html(card_title("Walk-forward", "Sharpe per anno di test"))
+            st.plotly_chart(walk_forward_chart(wf.folds), config=PLOTLY_CONFIG, width="stretch")
+            st.html('<div class="ql-note">Ogni anno il lookback è scelto usando solo gli anni '
+                    'precedenti (passa sopra una barra per vederlo).</div>')
 
 
 # --- Drawdown -----------------------------------------------------------------

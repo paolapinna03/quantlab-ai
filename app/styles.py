@@ -32,6 +32,21 @@ CSS = f"""
   border: 1px solid {BORDER}; color: #c9ccd1; background: #17191c; white-space: nowrap; }}
 .ql-badge.lock {{ border-color: rgba(57,135,229,.45); color: #8fbaf0; }}
 .ql-badge.warn {{ border-color: rgba(201,133,0,.5); color: #e0b45a; }}
+.ql-badge.pass {{ border-color: rgba(63,182,139,.55); color: #6fd0a8; font-weight: 600; }}
+.ql-badge.fail {{ border-color: rgba(230,103,103,.55); color: #f08f8f; font-weight: 600; }}
+
+.ql-crit td {{ vertical-align: top; }}
+.ql-crit .name {{ color: #e8e9eb; font-weight: 500; }}
+.ql-crit .why {{ display: block; color: {MUTED}; font-size: .72rem; font-weight: 400;
+  margin-top: 2px; line-height: 1.4; max-width: 520px; }}
+.ql-status {{ display: inline-block; font-size: .72rem; font-weight: 600; padding: 2px 8px;
+  border-radius: 999px; white-space: nowrap; }}
+.ql-status.ok {{ color: #6fd0a8; background: rgba(63,182,139,.12); }}
+.ql-status.ko {{ color: #f08f8f; background: rgba(230,103,103,.12); }}
+.ql-verdict {{ font-size: 1.5rem; font-weight: 700; letter-spacing: .04em; margin: 4px 0 6px; }}
+.ql-verdict.ok {{ color: #6fd0a8; }}
+.ql-verdict.ko {{ color: #f08f8f; }}
+.ql-verdict-text {{ font-size: .8rem; color: #c9ccd1; line-height: 1.5; margin-bottom: 14px; }}
 
 .ql-card-title {{ display: flex; justify-content: space-between; align-items: baseline;
   font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
@@ -83,3 +98,35 @@ def card_title(title: str, hint: str = "") -> str:
 
 def section(label: str) -> str:
     return f'<div class="ql-section">{esc(label)}</div>'
+
+
+def _format_check(name: str, value: float) -> str:
+    if name == "Max drawdown":
+        return f"{value:.1%}"
+    if name in ("Deflated Sharpe", "Sharpe > benchmark"):
+        return f"{value:.3f}"
+    return f"{value:.2f}"
+
+
+def criteria_table(checks) -> str:
+    """Tabella dei criteri: esito con icona + testo, mai solo colore."""
+    rows = "".join(
+        f"""<tr>
+          <td><span class="name">{esc(c.name)}</span><span class="why">{esc(c.meaning)}</span></td>
+          <td>{_format_check(c.name, c.value)}</td>
+          <td>{esc(c.threshold)}</td>
+          <td><span class="ql-status {'ok' if c.passed else 'ko'}">
+              {'✓ superato' if c.passed else '✗ fallito'}</span></td>
+        </tr>"""
+        for c in checks
+    )
+    return f"""<table class="ql-table ql-crit">
+      <thead><tr><th>Criterio</th><th>Valore</th><th>Soglia</th><th>Esito</th></tr></thead>
+      <tbody>{rows}</tbody></table>"""
+
+
+def verdict_block(promoted: bool, text: str) -> str:
+    cls = "ok" if promoted else "ko"
+    label = "✓ PROMOSSA" if promoted else "✗ RESPINTA"
+    return (f'<div class="ql-verdict {cls}">{label}</div>'
+            f'<div class="ql-verdict-text">{esc(text)}</div>')
