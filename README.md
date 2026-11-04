@@ -26,7 +26,10 @@ python examples/04_risk_allocation.py       # allocazione basata sul rischio (pr
 python -m quantlab.discovery                # Strategy Discovery (sessione etf_tbill_v1, ~1 min)
 python -m quantlab.experiments              # registro degli esperimenti
 python -m quantlab.experiments --reproduce <id>
-streamlit run app/streamlit_app.py          # dashboard: Backtesting + Strategy Discovery
+python -m quantlab.paper create             # crea il conto simulato rp_momentum
+python -m quantlab.paper run                # ogni giorno dopo le 22:30 italiane
+python -m quantlab.paper status
+streamlit run app/streamlit_app.py          # dashboard: Backtesting, Discovery, Paper Trading
 ```
 
 ## Principi

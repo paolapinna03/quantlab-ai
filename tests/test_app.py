@@ -77,3 +77,25 @@ def test_dashboard_warns_when_parameters_change():
     at.select_slider[0].set_value(126).run()
     assert not at.exception
     assert len(at.warning) == 1
+
+
+def test_paper_page_empty_and_with_account(tmp_path, monkeypatch):
+    from quantlab.paper import PaperStore, RiskLimits, create_account, run_account
+    db = tmp_path / "paper.sqlite"
+    monkeypatch.setenv("QUANTLAB_PAPER_DB", str(db))
+    at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
+    assert not at.exception and any("quantlab.paper create" in i.value for i in at.info)
+
+    idx = pd.bdate_range("2019-01-01", periods=420)
+    rng = np.random.default_rng(0)
+    p = pd.DataFrame(100 * np.cumprod(1 + rng.normal(0.0004, 0.01, (420, 2)), axis=0),
+                     index=idx, columns=["AAA", "BBB"])
+    spec = {"strategy": "risk_allocation", "params": {"lookback": 126, "max_weight": 0.7},
+            "universe": ["AAA", "BBB"], "cost_bps": 5.0, "cash": "zero"}
+    store = PaperStore(db)
+    create_account(store, "demo", spec, 10_000, RiskLimits(max_weight=0.7))
+    for k in range(380, 420):
+        run_account(store, "demo", prices=p.iloc[:k + 1], today=p.index[k])
+    at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert len(at.metric) == 5

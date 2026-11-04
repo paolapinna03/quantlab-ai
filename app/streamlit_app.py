@@ -24,6 +24,7 @@ page = st.navigation(
     [
         st.Page("page_backtesting.py", title="Backtesting", icon=":material/show_chart:", default=True),
         st.Page("page_discovery.py", title="Strategy Discovery", icon=":material/travel_explore:"),
+        st.Page("page_paper.py", title="Paper Trading", icon=":material/play_circle:"),
     ],
     position="top",
 )
