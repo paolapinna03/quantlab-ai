@@ -234,7 +234,7 @@ if len(accounts) > 1:
             <th>Rendimento</th><th>Max DD</th><th>Liquidità</th><th>Giorni</th></tr></thead>
             <tbody>{rows}</tbody></table>
             <div class="ql-note">Confronto dal {common:%d %b %Y}. Con poche settimane le differenze sono
-            rumore: nel backtest le due strategie hanno correlazione 0,81 e differenza non significativa.</div>""")
+            rumore: nel backtest 2007-2022 le differenze di Sharpe tra le strategie non erano significative.</div>""")
         if curves and max(len(c) for c in curves.values()) >= 2:
             st.plotly_chart(equity_chart(curves, color_map(list(curves)), log=False),
                             config=PLOTLY_CONFIG, width="stretch")

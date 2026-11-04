@@ -105,6 +105,47 @@ _ALLOC_REF = [{"method": m, "lookback": 252, "max_weight": 0.4, "shrinkage": Tru
                            ("risk_parity", 252), ("mean_variance", 0)]]
 
 
+# --- Trend su più orizzonti / volatility targeting ---------------------------------
+
+_MULTI = (21, 63, 126, 252)
+_HORIZONS = {"Solo 12 mesi": (252,), "1-3-6-12 mesi": _MULTI, "3-6-12 mesi": (63, 126, 252),
+             "6-12 mesi": (126, 252)}
+
+
+def _trend_controls():
+    st.html('<div class="ql-section">Segnali di trend</div>')
+    h = st.selectbox("Orizzonti", list(_HORIZONS), index=1, key="tr_h")
+    vt = st.select_slider("Volatility target", [0.0, 0.06, 0.08, 0.10], value=0.0, key="tr_v",
+                          format_func=lambda v: "nessuno" if v == 0 else f"{v:.0%} annuo")
+    params = {"horizons": _HORIZONS[h]}
+    if vt:
+        params |= {"vol_target": vt, "vol_lookback": 63}
+    return params, {}
+
+
+def _trend_md(p, e):
+    hs = ", ".join(f"{h // 21}" for h in p["horizons"])
+    vt = p.get("vol_target", 0)
+    return f"""
+**Strategia.** Per ogni ETF si guarda il segno del rendimento passato a {hs} mesi e si fa la media:
+l'ETF riceve quella frazione della sua quota 1/N (per esempio 3 segnali positivi su 4 → 75%).
+Il resto va in liquidità. {f"Se la volatilità stimata del portafoglio (ultimi 63 giorni) supera il "
+f"{vt:.0%} annuo, tutte le posizioni vengono ridotte in proporzione, mai con leva. " if vt else ""}
+Ribilanciamento mensile, esecuzione il giorno dopo.
+Fonti: Hurst, Ooi & Pedersen (2017); Moreira & Muir (2017).
+Pre-registrazione ed esito: `docs/preregistrazioni/trend_vol_etf.md`."""
+
+
+_TREND_REF = [{"horizons": (252,), "vol_target": 0.08, "vol_lookback": 63}, {"horizons": _MULTI},
+              {"horizons": _MULTI, "vol_target": 0.08, "vol_lookback": 63}]
+
+
+def _trend_grid(p):
+    if p.get("vol_target"):
+        return [p | {"vol_target": t} for t in (0.06, 0.08, 0.10)]
+    return [p | {"horizons": h} for h in (_MULTI, (63, 126, 252), (126, 252))]
+
+
 # --- Swing -------------------------------------------------------------------------
 
 def _swing_engine():
@@ -178,6 +219,14 @@ PRESETS = {
         default_universe=["SPY", "EFA", "EEM", "IWM", "TLT", "IEF", "GLD", "DBC", "VNQ"],
         controls=_alloc_controls, reference=_ALLOC_REF, method_md=_alloc_md,
         grid=lambda p: [p | {"lookback": lb} for lb in (126, 252, 504)],
+    ),
+    "trend": Preset(
+        key="trend", label="Trend su più orizzonti / volatility targeting", short="Trend multi",
+        family="trend_vol_etf", strategy="trend_signals",
+        hypothesis="Trend su più orizzonti e volatility targeting migliorano il controllo del rischio "
+                   "del time-series momentum 12 mesi a parità di rendimento.",
+        default_universe=["SPY", "EFA", "EEM", "IWM", "TLT", "IEF", "GLD", "DBC", "VNQ"],
+        controls=_trend_controls, reference=_TREND_REF, method_md=_trend_md, grid=_trend_grid,
     ),
     "rsi2": Preset(
         key="rsi2", label="Swing · RSI(2) mean reversion", short="RSI(2)",

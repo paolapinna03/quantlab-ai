@@ -31,6 +31,17 @@ PRESETS = {
                 "di rp_momentum: nel backtest 2007-2022 rendimento simile, rischio più alto "
                 "(correlazione 0,81, differenza non significativa).",
     },
+    "trend_multi": {
+        "spec": {
+            "strategy": "trend_signals",
+            "params": {"horizons": [21, 63, 126, 252]},
+            "universe": ETF_9, "cost_bps": DEFAULT_COST_BPS, "cash": DEFAULT_CASH,
+        },
+        "note": "Trend su più orizzonti (1, 3, 6, 12 mesi), famiglia trend_vol_etf (non promossa: 5/6 "
+                "criteri, non significativamente migliore di 1/N). Entrata in paper trading per la "
+                "regola pre-registrata: nel backtest 2007-2022 max drawdown -9,8% contro -14,1% e "
+                "Sharpe 0,52 contro 0,46 di tsmom_9etf (differenza non significativa, p 0,31).",
+    },
     "ai_analyst": {
         "spec": {
             "strategy": "ai_ideas", "params": {},
@@ -44,5 +55,6 @@ PRESETS = {
 PRESET_LABELS = {
     "rp_momentum": "Risk parity + momentum 12 mesi (9 ETF multi-asset)",
     "tsmom_9etf": "Momentum 12 mesi, pesi uguali (stessi 9 ETF)",
+    "trend_multi": "Trend su più orizzonti 1-3-6-12 mesi (stessi 9 ETF)",
     "ai_analyst": "Idee dell'analista AI (esperimento, stessi 9 ETF)",
 }

@@ -57,3 +57,31 @@ Un candidato entra in paper trading come nuovo conto simulato **solo se**:
 
 Se più candidati soddisfano la regola, entra solo quello con lo Sharpe più alto. Se nessuno la
 soddisfa, nessun nuovo conto viene aperto e l'esito viene riportato com'è.
+
+---
+
+## Esito (aggiunto dopo il test, pre-registrazione nel commit 8cdaef1)
+
+Finestra di valutazione 2007-03-12 → 2022-12-30 (9 ETF), `python examples/06_trend_vol.py`.
+
+| Strategia | CAGR | Vol | Sharpe | Max DD | Turnover/anno | p vs 1/N | p vs tsmom 12m | DSR | Criteri | Verdetto |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Trend 12m + vol target 8% | 3,7% | 6,7% | 0,45 | -14,3% | 1,55 | 0,390 | 0,549 | 0,950* | 4/6 | Respinta |
+| Trend multi-orizzonte | 4,2% | 6,8% | 0,52 | -9,8% | 2,52 | 0,249 | 0,309 | 0,973 | 5/6 | Respinta |
+| Multi-orizzonte + vol target 8% | 3,8% | 6,0% | 0,51 | -9,8% | 2,42 | 0,265 | 0,322 | 0,971 | 5/6 | Respinta |
+| Momentum 12m (tsmom_9etf) | 4,2% | 7,9% | 0,46 | -14,1% | 1,40 | — | — | — | — | — |
+| Pesi uguali 1/N | 5,4% | 13,8% | 0,39 | -38,8% | 0,38 | — | — | — | — | — |
+
+\* 0,9496 arrotondato: sotto la soglia di 0,95.
+
+Lettura:
+- **Volatility targeting**: nessun beneficio. Con ribilanciamento mensile la riduzione arriva in
+  ritardo; drawdown e Sharpe restano quelli del momentum 12 mesi, con meno rendimento.
+- **Trend multi-orizzonte**: drawdown da -14,1% a -9,8% e Sharpe da 0,46 a 0,52, stesso CAGR,
+  in linea con l'aspettativa. La differenza di Sharpe non è significativa (p 0,31); il turnover
+  è quasi doppio, già incluso nei costi e sopravvive ai costi ×3.
+- Aggiungere il vol target al multi-orizzonte non migliora nulla.
+
+**Regola per il paper trading:** candidati 2 e 3 falliscono solo il confronto con 1/N e battono
+tsmom 12m su drawdown e Sharpe. Entra il candidato con lo Sharpe più alto: **Trend multi-orizzonte**
+(conto `trend_multi`).
