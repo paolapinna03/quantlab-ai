@@ -67,7 +67,7 @@ def test_unknown_entry_rejected():
 
 def small_config(**kw):
     base = dict(name="test", universe=("AAA", "BBB", "CCC"), budget=12, top_k=3, seed=3,
-                min_trades=5)
+                min_trades=5, cash="zero")   # i test offline non scaricano i tassi
     return DiscoveryConfig(**(base | kw))
 
 

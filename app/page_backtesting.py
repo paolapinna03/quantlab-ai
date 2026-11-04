@@ -14,6 +14,7 @@ from charts import (
 )
 from styles import card_title, criteria_table, esc, header, section, verdict_block
 from quantlab.config import DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
+from quantlab.config import DEFAULT_CASH
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.metrics import drawdown_series, equity_curve
 from quantlab.validation import Criteria, validate_candidate
@@ -56,6 +57,7 @@ def run_all(tickers: tuple[str, ...], lookback: int, long_only: bool, cost_bps: 
                          ExperimentRegistry())
     start = str(mom.eval_start.date())
     bench = run_experiment(ExperimentSpec(
+        cash=DEFAULT_CASH,
         family="benchmark", strategy="buy_and_hold", universe=("SPY",), eval_start=start, **common))
     equal = run_experiment(equal_weight_spec(tickers, cost_bps, lag, eval_start=start))
     return {BENCH: bench, EQUAL: equal, MOM: mom}
@@ -75,14 +77,14 @@ def run_validation(tickers: tuple[str, ...], lookback: int, long_only: bool, cos
 
 
 def momentum_spec(tickers, lookback, long_only, cost_bps, lag) -> ExperimentSpec:
-    return ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
+    return ExperimentSpec(cash=DEFAULT_CASH, family=FAMILY, strategy="time_series_momentum",
                           params={"lookback": lookback, "long_only": long_only},
                           universe=tickers, hypothesis=HYPOTHESIS,
                           cost_bps=cost_bps, execution_lag=lag)
 
 
 def equal_weight_spec(tickers, cost_bps, lag, eval_start=None) -> ExperimentSpec:
-    return ExperimentSpec(family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
+    return ExperimentSpec(cash=DEFAULT_CASH, family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
                           universe=tickers, eval_start=eval_start,
                           cost_bps=cost_bps, execution_lag=lag)
 
@@ -253,7 +255,7 @@ with right, st.container(border=True):
       </table>
       <div class="ql-note">Stessa finestra per tutte le strategie, al netto dei costi.
       Differenze di Sharpe inferiori a ~2 errori standard non sono significative.
-      Tasso privo di rischio posto a zero.</div>""")
+      Sharpe calcolato sul rendimento in eccesso rispetto ai T-bill USA a 3 mesi.</div>""")
 
     st.html(card_title("Esposizione momentum", "vuoto = liquidità"))
     w = results[MOM].weights.loc[start:end]
@@ -388,7 +390,9 @@ mensilmente sugli stessi ETF della strategia.
 - Prezzi di chiusura aggiustati per dividendi e frazionamenti (Yahoo Finance, fonte non ufficiale).
 - Segnale calcolato alla chiusura, eseguito {execution_text}.
 - Costi: {cost_bps:g} bp per ogni unità di capitale scambiata (commissioni, spread, slippage).
-- La liquidità rende 0%: penalizza leggermente il momentum, che resta spesso in liquidità.
+- La liquidità rende il tasso dei T-bill USA a 3 mesi (^IRX, circa 1,2% medio annuo nel 2005-2022).
+- Sharpe, Sortino e criteri di promozione usano il rendimento **in eccesso** su quel tasso:
+  restare in liquidità non viene premiato come se fosse un vantaggio della strategia.
 - Nessuna leva, nessun costo di prestito titoli.
 
 **Limiti.** Risultati storici e in-sample: i parametri vengono dalla letteratura, ma il

@@ -136,10 +136,11 @@ with st.container(border=True):
 # --- Dettaglio di una candidata ------------------------------------------------------------
 
 @st.cache_data(show_spinner="Calcolo il benchmark…")
-def benchmark_returns(universe: tuple[str, ...], start: str, end: str, cost: float) -> pd.Series:
+def benchmark_returns(universe: tuple[str, ...], start: str, end: str, cost: float,
+                      cash: str) -> pd.Series:
     out = run_experiment(ExperimentSpec(family="benchmark", strategy="buy_and_hold",
                                         params={"rebalance": "M"}, universe=universe,
-                                        eval_start=start, eval_end=end, cost_bps=cost))
+                                        eval_start=start, eval_end=end, cost_bps=cost, cash=cash))
     return out.result.returns.loc[start:end]
 
 
@@ -152,7 +153,7 @@ with st.container(border=True):
     with d_left:
         cand_r = registry.returns(row["run_id"])
         bench_r = benchmark_returns(tuple(row["universe"]), row["eval_start"], row["eval_end"],
-                                    float(row["cost_bps"]))
+                                    float(row["cost_bps"]), row["cash"])
         curves = {"Candidata": equity_curve(cand_r, 100), "Pesi uguali": equity_curve(bench_r, 100)}
         st.plotly_chart(equity_chart(curves, color_map(["Candidata", "Pesi uguali"]), log=False),
                         config=PLOTLY_CONFIG, width="stretch")

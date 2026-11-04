@@ -17,17 +17,19 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quantlab.config import DEFAULT_CASH
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec
 from quantlab.validation import Criteria, validate_candidate
 
 UNIVERSE = ("SPY", "QQQ", "TLT", "GLD")
 CANDIDATE = ExperimentSpec(
+    cash=DEFAULT_CASH,
     family="tsmom_etf", strategy="time_series_momentum", params={"lookback": 252},
     universe=UNIVERSE,
     hypothesis="Il rendimento total-return degli ultimi 12 mesi di un ETF liquido predice "
                "positivamente il suo rendimento del mese successivo (Moskowitz, Ooi & Pedersen, 2012).",
 )
-BENCHMARK = ExperimentSpec(family="benchmark", strategy="buy_and_hold",
+BENCHMARK = ExperimentSpec(cash=DEFAULT_CASH, family="benchmark", strategy="buy_and_hold",
                            params={"rebalance": "M"}, universe=UNIVERSE)
 # Per il walk-forward: ogni anno si sceglie il lookback migliore usando solo il passato.
 GRID = [{"lookback": lb} for lb in (63, 126, 189, 252, 378)]

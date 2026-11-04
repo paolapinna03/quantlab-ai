@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quantlab.config import DEFAULT_CASH
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 
 FAMILY = "tsmom_etf"
@@ -32,7 +33,7 @@ HYPOTHESIS = (
 def compare(title: str, universe: tuple[str, ...], registry: ExperimentRegistry) -> None:
     # La strategia viene registrata: è un tentativo di verificare l'ipotesi.
     mom = run_experiment(
-        ExperimentSpec(family=FAMILY, strategy="time_series_momentum",
+        ExperimentSpec(cash=DEFAULT_CASH, family=FAMILY, strategy="time_series_momentum",
                        params={"lookback": 252}, universe=universe, hypothesis=HYPOTHESIS),
         registry,
     )
@@ -40,10 +41,12 @@ def compare(title: str, universe: tuple[str, ...], registry: ExperimentRegistry)
     # I benchmark non sono ipotesi: non vengono registrati né contati come tentativi.
     bench = {
         "Buy & hold SPY": run_experiment(ExperimentSpec(
+            cash=DEFAULT_CASH,
             family="benchmark", strategy="buy_and_hold", universe=("SPY",), eval_start=start)),
     }
     if len(universe) > 1:
         bench["Pesi uguali (ribil. mensile)"] = run_experiment(ExperimentSpec(
+            cash=DEFAULT_CASH,
             family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
             universe=universe, eval_start=start))
 
@@ -68,7 +71,7 @@ def main() -> None:
     compare("B) SPY+QQQ+TLT+GLD: momentum contro pesi uguali", ("SPY", "QQQ", "TLT", "GLD"), registry)
     print(
         "\nNota: risultati storici in-sample, costi ipotizzati (5 bp per lato), "
-        "liquidità a rendimento zero. Non sono una previsione di rendimenti futuri."
+        "liquidità remunerata al tasso dei T-bill USA. Non sono una previsione di rendimenti futuri."
         "\nRegistro: python -m quantlab.experiments"
     )
 

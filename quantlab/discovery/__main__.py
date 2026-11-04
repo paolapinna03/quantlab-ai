@@ -24,7 +24,7 @@ ETF_UNIVERSE = ("SPY", "QQQ", "IWM", "EFA", "EEM", "TLT", "IEF", "GLD",
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Strategy Discovery su ETF liquidi.")
-    parser.add_argument("--name", default="etf_v1", help="nome della sessione (famiglia nel registro)")
+    parser.add_argument("--name", default="etf_tbill_v1", help="nome della sessione (famiglia nel registro)")
     parser.add_argument("--budget", type=int, default=60, help="candidate da testare")
     parser.add_argument("--top", type=int, default=5, help="candidate da confermare")
     parser.add_argument("--seed", type=int, default=7)

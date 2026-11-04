@@ -35,7 +35,8 @@ def synthetic_discovery(db) -> None:
         o = np.r_[c[0], c[:-1]]
         ohlc[t] = pd.DataFrame({"open": o, "high": np.maximum(o, c) * 1.006,
                                 "low": np.minimum(o, c) * 0.994, "close": c}, index=idx)
-    cfg = DiscoveryConfig(name="ui", universe=("SPY", "TLT"), budget=6, top_k=2, min_trades=3)
+    cfg = DiscoveryConfig(name="ui", universe=("SPY", "TLT"), budget=6, top_k=2, min_trades=3,
+                          cash="zero")
     run_discovery(cfg, ExperimentRegistry(db), ohlc=ohlc)
 
 

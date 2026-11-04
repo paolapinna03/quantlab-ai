@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass, field, replace
 import numpy as np
 import pandas as pd
 
-from quantlab.config import DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
+from quantlab.config import DEFAULT_CASH, DEFAULT_COST_BPS, HOLDOUT_START, RESEARCH_END
 from quantlab.discovery.space import full_space, sample_space
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.strategies.rules import describe
@@ -43,6 +43,7 @@ class DiscoveryConfig:
     confirm_end: str = RESEARCH_END
     min_trades: int = 30             # sotto questa soglia lo Sharpe è troppo rumoroso
     cost_bps: float = DEFAULT_COST_BPS
+    cash: str = DEFAULT_CASH         # rendimento della liquidità (e base dello Sharpe in eccesso)
     base_engine: dict = field(default_factory=lambda: {"max_positions": 5, "position_fraction": 0.2})
 
     def __post_init__(self):
@@ -87,7 +88,7 @@ def run_discovery(
     for i, (params, engine) in enumerate(candidates, 1):
         spec = ExperimentSpec(
             family=config.search_family, strategy="rule_swing", params=params,
-            universe=config.universe, eval_end=config.train_end, cost_bps=config.cost_bps,
+            universe=config.universe, eval_end=config.train_end, cost_bps=config.cost_bps, cash=config.cash,
             engine=config.base_engine | engine, hypothesis=describe(params, engine),
         )
         row = {"candidate": i, "description": describe(params, engine),
@@ -117,7 +118,7 @@ def run_discovery(
         ExperimentSpec(
             family=config.confirm_family, strategy="rule_swing", params=cand["params"],
             universe=config.universe, eval_start=config.confirm_start, eval_end=config.confirm_end,
-            cost_bps=config.cost_bps, engine=config.base_engine | cand["engine"],
+            cost_bps=config.cost_bps, cash=config.cash, engine=config.base_engine | cand["engine"],
             hypothesis=cand["description"],
         )
         for _, cand in top.iterrows()

@@ -38,7 +38,7 @@ def load_session(registry: ExperimentRegistry, name: str | None = None) -> dict 
          "confirm_max_drawdown": r.metrics.get("max_drawdown"),
          "confirm_trades": r.metrics.get("trade_trades"),
          "eval_start": r.eval_start, "eval_end": r.eval_end, "universe": r.spec.get("universe"),
-         "cost_bps": r.spec.get("cost_bps"),
+         "cost_bps": r.spec.get("cost_bps"), "cash": r.spec.get("cash", "zero"),
          "verdict": verdicts.get(r.id, {}).get("verdict", "—"),
          "checks": verdicts.get(r.id, {}).get("checks", [])}
         for d, r in latest(registry.records(confirm_family)).items()

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quantlab.config import DEFAULT_CASH
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec
 from quantlab.validation import Criteria, validate_candidate
 
@@ -27,17 +28,19 @@ ENGINE = {"max_positions": 5, "position_fraction": 0.2}
 
 CANDIDATES = {
     "RSI(2) mean reversion": ExperimentSpec(
+        cash=DEFAULT_CASH,
         family="swing_rsi2_etf", strategy="rsi2_mean_reversion", universe=UNIVERSE, engine=ENGINE,
         hypothesis="Dopo forti cali di 1-2 giorni in un trend rialzista, gli ETF liquidi tendono "
                    "a rimbalzare nei giorni successivi (inversione di breve periodo).",
     ),
     "Donchian breakout 55/20": ExperimentSpec(
+        cash=DEFAULT_CASH,
         family="swing_donchian_etf", strategy="donchian_breakout", universe=UNIVERSE, engine=ENGINE,
         hypothesis="Le rotture dei massimi a 55 giorni segnalano trend che tendono a proseguire "
                    "(trend following su orizzonte di settimane).",
     ),
 }
-BENCHMARK = ExperimentSpec(family="benchmark", strategy="buy_and_hold",
+BENCHMARK = ExperimentSpec(cash=DEFAULT_CASH, family="benchmark", strategy="buy_and_hold",
                            params={"rebalance": "M"}, universe=UNIVERSE)
 
 
