@@ -20,9 +20,11 @@ APP_DIR = Path(__file__).resolve().parents[1] / "app"
 
 @pytest.fixture(autouse=True)
 def temp_registry(tmp_path, monkeypatch):
-    """I test non devono scrivere nel registro reale degli esperimenti."""
+    """I test non devono scrivere nel registro reale né nello stato del paper trading automatico."""
     db = tmp_path / "exp.sqlite"
     monkeypatch.setenv("QUANTLAB_DB", str(db))
+    monkeypatch.setenv("QUANTLAB_PAPER_DB", str(tmp_path / "paper-default.sqlite"))
+    monkeypatch.setenv("QUANTLAB_AUTOMATION", "0")       # pulsanti manuali visibili
     return db
 
 
@@ -174,3 +176,16 @@ def test_paper_page_compares_accounts(tmp_path, monkeypatch):
             run_account(store, name, prices=p.iloc[:k + 1], today=p.index[k])
     at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
     assert not at.exception, at.exception
+
+
+def test_paper_page_automated_mode(tmp_path, monkeypatch):
+    """Con l'automazione attiva la pagina non offre azioni che modificano i conti in locale."""
+    monkeypatch.delenv("QUANTLAB_AUTOMATION")
+    from quantlab.paper.store import automation_info
+    if automation_info() is None:
+        pytest.skip("automazione non configurata in questa copia della repo")
+    at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+    labels = {b.label for b in at.button}
+    assert not labels & {"Crea il conto", "Elabora i giorni nuovi", "Ferma", "Ferma e vendi tutto"}
+    assert any("Automazione attiva" in i.value for i in at.info)

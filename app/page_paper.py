@@ -5,16 +5,48 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+import re
+import subprocess
+
 from charts import PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart
 from styles import card_title, esc, header
-import re
-
 from quantlab.paper import PaperStore, RiskLimits, create_account, halt, resume, run_account
 from quantlab.paper.presets import PRESET_LABELS
 from quantlab.paper.presets import PRESETS as PAPER_PRESETS
+from quantlab.paper.store import automation_info
 
-store = PaperStore()
-accounts = store.accounts()
+from quantlab.paper.store import default_paper_db
+
+AUTO = automation_info()
+# In modalità automatica il file condiviso è scritto solo da GitHub: la dashboard non deve
+# crearlo (un file locale vuoto andrebbe in conflitto con quello scaricato da git pull).
+if AUTO and not default_paper_db().exists():
+    store, accounts = None, []
+else:
+    store = PaperStore()
+    accounts = store.accounts()
+
+
+def actions_url() -> str | None:
+    """Pagina del workflow su GitHub, ricavata dal remote della repo."""
+    try:
+        url = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True,
+                             text=True, timeout=5).stdout.strip()
+    except Exception:
+        return None
+    m = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", url)
+    if not m or not AUTO:
+        return None
+    return f"https://github.com/{m.group(1)}/{m.group(2)}/actions/workflows/{AUTO['workflow']}"
+
+
+def automation_notice() -> None:
+    url = actions_url()
+    link = f"[GitHub → Actions → Paper trading giornaliero]({url})" if url else "GitHub → Actions → Paper trading giornaliero"
+    st.info(f"**Automazione attiva.** I conti vengono elaborati da GitHub ogni sera ({AUTO['schedule']}) "
+            f"e lo stato viene salvato nella repo. Per vedere l'ultima giornata qui: `git pull` e ricarica. "
+            f"Per elaborare subito, fermare o riattivare un conto: {link} → **Run workflow**.",
+            icon=":material/schedule:")
 
 
 def create_form(expanded: bool) -> None:
@@ -46,9 +78,14 @@ def create_form(expanded: bool) -> None:
 if not accounts:
     st.html(header("Paper Trading", "Nessun conto simulato", "Soldi simulati, prezzi reali.",
                    [("Soldi simulati", "lock")]))
-    st.info("Crea il primo conto: la strategia girerà ogni giorno su prezzi reali e nuovi, "
-            "con soldi simulati. Nessun ordine viene inviato a un broker.")
-    create_form(expanded=True)
+    if AUTO:
+        automation_notice()
+        st.caption("I conti verranno creati dalla prima esecuzione su GitHub "
+                   "(stasera, oppure subito con Run workflow).")
+    else:
+        st.info("Crea il primo conto: la strategia girerà ogni giorno su prezzi reali e nuovi, "
+                "con soldi simulati. Nessun ordine viene inviato a un broker.")
+        create_form(expanded=True)
     st.stop()
 
 with st.sidebar:
@@ -56,7 +93,9 @@ with st.sidebar:
     default = st.session_state.get("paper_account")
     name = st.selectbox("Conto", names, index=names.index(default) if default in names else 0)
     st.html('<div class="ql-section">Giornata</div>')
-    if st.button("Elabora i giorni nuovi", type="primary", width="stretch",
+    if AUTO:
+        st.caption("Elaborazione automatica su GitHub ogni sera.")
+    elif st.button("Elabora i giorni nuovi", type="primary", width="stretch",
                  help="Scarica i prezzi aggiornati, esegue gli ordini in attesa e calcola i segnali. "
                       "Da usare una volta al giorno dopo le 22:30 italiane; i giorni saltati vengono recuperati."):
         with st.spinner("Scarico i prezzi ed elaboro…"):
@@ -74,7 +113,11 @@ active = acc["status"] == "attivo"
 
 with st.sidebar:
     st.html('<div class="ql-section">Pulsante di emergenza</div>')
-    if active:
+    if AUTO:
+        url = actions_url()
+        st.caption("Con l'automazione attiva il conto si ferma da GitHub: Run workflow → azione "
+                   "`ferma` o `ferma_e_vendi`." + (f" [Apri]({url})" if url else ""))
+    elif active:
         sure = st.checkbox("Confermo di voler fermare il conto")
         if st.button("Ferma", disabled=not sure, width="stretch",
                      help="Nessun nuovo ordine; le posizioni restano."):
@@ -113,8 +156,9 @@ st.html(header(
 
 with st.expander("Come funziona"):
     st.markdown(f"""
-- **Ogni giorno dopo le 22:30 italiane** (chiusura di New York) premi **"Elabora i giorni nuovi"**
-  nella barra laterale. Se salti dei giorni, vengono recuperati in ordine; premerlo due volte non duplica nulla.
+- **Ogni sera dopo la chiusura di New York** il conto viene elaborato: automaticamente da GitHub se
+  l'automazione è attiva, altrimenti con il pulsante **"Elabora i giorni nuovi"**. I giorni saltati
+  vengono recuperati in ordine; elaborare due volte non duplica nulla.
 - **Tempistica identica al backtest**: i pesi decisi alla chiusura di un giorno vengono eseguiti alla
   chiusura successiva. Un test verifica che il paper trading e il backtest diano gli stessi rendimenti.
 - **La strategia ribilancia a fine mese.** Negli altri giorni le posizioni si muovono solo con i prezzi.
@@ -134,10 +178,13 @@ if summary is not None:
     for m in summary.messages:
         st.info(m)
 
-create_form(expanded=False)
+if AUTO:
+    automation_notice()
+else:
+    create_form(expanded=False)
 
 if not last:
-    st.info("Il conto esiste ma non è ancora stato elaborato: usa \"Elabora i giorni nuovi\".")
+    st.info("Il conto esiste ma non è ancora stato elaborato.")
     st.stop()
 
 # --- KPI ---------------------------------------------------------------------------

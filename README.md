@@ -28,7 +28,16 @@ streamlit run app/streamlit_app.py
 | Paper Trading | crei un conto simulato, elabori i giorni nuovi, fermi il conto in emergenza |
 | Dati e registro | aggiorni i prezzi, aggiungi ETF, consulti e riproduci ogni esperimento, leggi le pre-registrazioni |
 
-I comandi da terminale restano disponibili per l'automazione:
+## Automazione (GitHub Actions)
+
+- **Paper trading giornaliero** (`.github/workflows/paper-daily.yml`): lun-ven alle 22:15 UTC elabora
+  i conti `rp_momentum` e `tsmom_9etf` e salva lo stato in `state/` con un commit. Il track record è
+  quindi datato e verificabile nella storia di Git. In locale: `git pull` e la dashboard mostra
+  l'ultima giornata. Per elaborare subito o fermare un conto: Actions → *Paper trading giornaliero* →
+  *Run workflow*.
+- **Test** (`.github/workflows/tests.yml`): `pytest` a ogni push.
+
+I comandi da terminale restano disponibili:
 
 ```bash
 pytest                                      # test offline (veloci)

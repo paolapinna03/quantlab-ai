@@ -17,6 +17,8 @@ data/cache/
 # Database locale degli esperimenti
 *.sqlite
 *.db
+# ...tranne lo stato del paper trading automatico, versionato di proposito
+!state/paper.sqlite
 
 # Segreti (chiavi API): MAI su Git
 .env

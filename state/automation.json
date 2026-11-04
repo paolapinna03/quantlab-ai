@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "workflow": "paper-daily.yml",
+  "schedule": "lun-ven 22:15 UTC (23:15 in Italia d'inverno, 00:15 d'estate)",
+  "note": "Lo stato in questa cartella è scritto solo da GitHub Actions. Per aggiornarlo in locale: git pull."
+}

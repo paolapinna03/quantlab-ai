@@ -20,7 +20,29 @@ from pathlib import Path
 import pandas as pd
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_PAPER_DB = _PROJECT_ROOT / "data" / "paper.sqlite"
+LOCAL_PAPER_DB = _PROJECT_ROOT / "data" / "paper.sqlite"       # uso manuale, non versionato
+STATE_DIR = _PROJECT_ROOT / "state"                             # stato condiviso, versionato su Git
+SHARED_PAPER_DB = STATE_DIR / "paper.sqlite"
+AUTOMATION_FILE = STATE_DIR / "automation.json"
+DEFAULT_PAPER_DB = LOCAL_PAPER_DB   # compatibilità
+
+
+def automation_info() -> dict | None:
+    """Configurazione dell'automazione (GitHub Actions), se attiva; None in modalità manuale.
+
+    QUANTLAB_AUTOMATION=0 forza la modalità manuale (usato nei test).
+    """
+    if os.environ.get("QUANTLAB_AUTOMATION") == "0" or not AUTOMATION_FILE.exists():
+        return None
+    info = json.loads(AUTOMATION_FILE.read_text())
+    return info if info.get("enabled") else None
+
+
+def default_paper_db() -> Path:
+    """Variabile QUANTLAB_PAPER_DB > stato condiviso (se l'automazione è attiva) > file locale."""
+    if os.environ.get("QUANTLAB_PAPER_DB"):
+        return Path(os.environ["QUANTLAB_PAPER_DB"])
+    return SHARED_PAPER_DB if automation_info() else LOCAL_PAPER_DB
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS accounts (
@@ -54,7 +76,7 @@ def _now() -> str:
 
 class PaperStore:
     def __init__(self, path: Path | str | None = None):
-        self.path = Path(path or os.environ.get("QUANTLAB_PAPER_DB") or DEFAULT_PAPER_DB)
+        self.path = Path(path) if path else default_paper_db()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as con, con:
             con.executescript(_SCHEMA)

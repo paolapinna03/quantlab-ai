@@ -1,0 +1,74 @@
+# Paper trading giornaliero: elabora i conti simulati e salva lo stato nella repo.
+# Ogni giornata elaborata diventa un commit in state/, quindi il track record è datato e verificabile.
+name: Paper trading giornaliero
+
+on:
+  schedule:
+    # Lun-ven alle 22:15 UTC: dopo la chiusura di New York sia con l'ora solare sia con quella legale.
+    - cron: "15 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      azione:
+        description: "Cosa fare"
+        type: choice
+        default: elabora
+        options: [elabora, ferma, ferma_e_vendi, riattiva]
+      conto:
+        description: "Conto (solo per ferma / ferma_e_vendi / riattiva)"
+        type: choice
+        default: rp_momentum
+        options: [rp_momentum, tsmom_9etf]
+
+permissions:
+  contents: write          # serve per salvare lo stato con un commit
+
+concurrency:
+  group: paper-trading     # mai due esecuzioni sullo stesso stato in contemporanea
+  cancel-in-progress: false
+
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installa le dipendenze
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Crea i conti mancanti
+        run: python -m quantlab.paper ensure
+
+      - name: Azione manuale
+        if: github.event_name == 'workflow_dispatch' && inputs.azione != 'elabora'
+        run: |
+          case "${{ inputs.azione }}" in
+            ferma)          python -m quantlab.paper halt "${{ inputs.conto }}" ;;
+            ferma_e_vendi)  python -m quantlab.paper halt "${{ inputs.conto }}" --liquidate ;;
+            riattiva)       python -m quantlab.paper resume "${{ inputs.conto }}" ;;
+          esac
+
+      - name: Elabora i giorni nuovi
+        run: |
+          python -m quantlab.paper run | tee run.log
+          python -m quantlab.paper export
+          python -m quantlab.paper status >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Salva lo stato nella repo
+        run: |
+          git config user.name "quantlab-paper-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/
+          if git diff --cached --quiet; then
+            echo "Nessun cambiamento da salvare (giorno di borsa già elaborato o festivo)."
+          else
+            git commit -m "Paper trading: $(date -u +%Y-%m-%d) [$(echo '${{ github.event_name }}')]"
+            git push
+          fi
