@@ -162,7 +162,8 @@ def dumbbell_chart(labels: list[str], train: list[float], confirm: list[float],
     fig.update_layout(hovermode="closest")
     fig.update_xaxes(showgrid=True, gridcolor=GRID, showspikes=False, title=dict(
         text="Sharpe ratio", font=dict(size=10, color=TEXT_MUTED)))
-    fig.update_yaxes(autorange="reversed", showgrid=False, side="left", tickformat="")
+    # type="category": altrimenti Plotly interpreta "#1" come il numero 1.
+    fig.update_yaxes(autorange="reversed", showgrid=False, side="left", tickformat="", type="category")
     return fig
 
 

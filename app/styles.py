@@ -29,7 +29,7 @@ CSS = f"""
 .ql-meta b {{ color: #c9ccd1; font-weight: 500; }}
 .ql-badges {{ display: flex; gap: 8px; flex-wrap: wrap; }}
 .ql-badge {{ font-size: .72rem; font-weight: 500; padding: 4px 10px; border-radius: 999px;
-  border: 1px solid {BORDER}; color: #c9ccd1; background: #17191c; white-space: nowrap; }}
+  border: 1px solid {BORDER}; color: #c9ccd1; background: #17191c; white-space: nowrap; cursor: default; }}
 .ql-badge.lock {{ border-color: rgba(57,135,229,.45); color: #8fbaf0; }}
 .ql-badge.warn {{ border-color: rgba(201,133,0,.5); color: #e0b45a; }}
 .ql-badge.pass {{ border-color: rgba(63,182,139,.55); color: #6fd0a8; font-weight: 600; }}
@@ -78,9 +78,16 @@ def esc(text: str) -> str:
     return html.escape(str(text))
 
 
-def header(eyebrow: str, title: str, meta: str, badges: list[tuple[str, str]]) -> str:
-    """`meta` può contenere <b>…</b> già sicuri; `badges` = [(testo, classe)]."""
-    chips = "".join(f'<span class="ql-badge {cls}">{esc(t)}</span>' for t, cls in badges)
+def header(eyebrow: str, title: str, meta: str, badges: list[tuple]) -> str:
+    """`meta` può contenere <b>…</b> già sicuri.
+
+    `badges` = [(testo, classe)] oppure [(testo, classe, spiegazione al passaggio del mouse)].
+    """
+    def chip(b):
+        text, cls = b[0], b[1]
+        tip = f' title="{esc(b[2])}"' if len(b) > 2 else ""
+        return f'<span class="ql-badge {cls}"{tip}>{esc(text)}</span>'
+    chips = "".join(chip(b) for b in badges)
     return f"""
 <div class="ql-header">
   <div>

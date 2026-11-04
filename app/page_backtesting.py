@@ -111,7 +111,9 @@ with st.sidebar:
     cost_bps = st.number_input("Costi per lato (bp)", 0.0, 100.0, DEFAULT_COST_BPS, 1.0)
     lag = st.segmented_control(
         "Esecuzione dell'ordine", [0, 1, 2], default=1,
-        format_func=lambda x: {0: "Stessa chiusura", 1: "t+1", 2: "t+2"}[x],
+        format_func=lambda x: {0: "Stessa chiusura", 1: "Giorno dopo", 2: "2 giorni dopo"}[x],
+        help="Quando viene eseguito l'ordine rispetto alla chiusura su cui si calcola il segnale. "
+             "\"Giorno dopo\" è l'ipotesi realistica; \"stessa chiusura\" è ottimistica.",
     )
     lag = 1 if lag is None else lag
 
@@ -144,19 +146,30 @@ modified = lookback != LITERATURE_LOOKBACK or not long_only
 
 # --- Intestazione ------------------------------------------------------------
 
-badges = [(f"Tentativo {trials} · famiglia {FAMILY}", "warn" if trials > 1 else ""),
-          (f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock"), ("In-sample", "")]
+badges = [
+    (f"{trials} configurazion{'e' if trials == 1 else 'i'} provat{'a' if trials == 1 else 'e'}",
+     "warn" if trials > 1 else "",
+     f"Varianti di questa ipotesi (famiglia {FAMILY}) già testate e registrate. Più sono, "
+     "più alta diventa la soglia del Deflated Sharpe."),
+    (f"Dati {HOLDOUT_START[:4]}+ riservati", "lock",
+     f"I dati dal {HOLDOUT_START} non vengono usati qui: servono per la verifica finale."),
+    ("Periodo di ricerca", "",
+     "Risultati sul periodo usato per studiare la strategia (in-sample): "
+     "tendono a essere più ottimistici del futuro."),
+]
 if modified:
-    badges.insert(0, ("Parametri modificati", "warn"))
+    badges.insert(0, ("Parametri modificati", "warn",
+                      "Diversi da quelli della letteratura: risultati da considerare esplorativi."))
 if report is not None:
     badges.insert(0, (f"{'✓' if report.promoted else '✗'} {report.verdict}",
-                      "pass" if report.promoted else "fail"))
+                      "pass" if report.promoted else "fail",
+                      "Esito dei criteri di promozione: vedi la sezione più in basso."))
 st.html(header(
     eyebrow="Backtesting · Esperimento 01",
     title="Time-series momentum contro buy-and-hold",
     meta=(f"<b>{start:%d %b %Y} → {end:%d %b %Y}</b> · {esc(', '.join(tickers))} · "
           f"costi <b>{cost_bps:g} bp</b> per lato · esecuzione <b>"
-          f"{ {0: 'stessa chiusura', 1: 't+1', 2: 't+2'}[lag] }</b>"),
+          f"{ {0: 'stessa chiusura', 1: 'giorno dopo', 2: '2 giorni dopo'}[lag] }</b>"),
     badges=badges,
 ))
 
@@ -171,23 +184,46 @@ if modified:
 
 # --- KPI ---------------------------------------------------------------------
 
+with st.expander("Come leggere questa pagina"):
+    st.markdown(f"""
+1. **In alto** il verdetto e i numeri chiave della strategia momentum. Le frecce colorate
+   confrontano con il **portafoglio a pesi uguali** sugli stessi ETF: è lo stesso benchmark
+   usato dai criteri di promozione, così si isola l'effetto del segnale da quello della diversificazione.
+2. **Grafici**: andamento di 100 € investiti, confronto tra strategie, quanto capitale il momentum
+   tiene investito in ogni ETF.
+3. **Criteri di promozione**: sei controlli statistici fissati prima di vedere i risultati.
+   Basta un fallimento per respingere la strategia.
+4. **Barra laterale**: cambiare i parametri è esplorazione, non scoperta. Ogni configurazione
+   che guardi viene registrata e alza l'asticella per tutte le altre.
+
+Tutti i numeri sono calcolati davvero, su dati dal 2005 al 2022. Il periodo dal {HOLDOUT_START[:4]}
+è escluso: servirà per la verifica finale.
+""")
+
+
 def pp(x: float) -> str:
-    return f"{x * 100:+.1f} pp vs SPY"
+    return f"{x * 100:+.1f} pp vs pesi uguali"
 
 
-mom, bench = stats.loc[MOM], stats.loc[BENCH]
+mom, bench = stats.loc[MOM], stats.loc[EQUAL]
 k = st.columns(5)
-k[0].metric("CAGR", f"{mom['cagr']:.2%}", pp(mom["cagr"] - bench["cagr"]), border=True)
+k[0].metric("CAGR", f"{mom['cagr']:.2%}", pp(mom["cagr"] - bench["cagr"]), border=True,
+            help="Rendimento medio annuo composto, al netto dei costi.")
 k[1].metric(f"Sharpe ± {mom['sharpe_se']:.2f}", f"{mom['sharpe']:.2f}",
-            f"{mom['sharpe'] - bench['sharpe']:+.2f} vs SPY", border=True,
-            help="± = errore standard (Lo, 2002). Differenze inferiori a circa 2 errori "
-                 "standard non sono statisticamente distinguibili.")
+            f"{mom['sharpe'] - bench['sharpe']:+.2f} vs pesi uguali", border=True,
+            help="Rendimento per unità di rischio (volatilità), annualizzato. Sopra 0,5 è buono "
+                 "per una strategia diversificata. ± = errore standard (Lo, 2002): differenze "
+                 "inferiori a circa 2 errori standard non sono statisticamente distinguibili.")
 k[2].metric("Max drawdown", f"{mom['max_drawdown']:.1%}",
-            pp(mom["max_drawdown"] - bench["max_drawdown"]), border=True)
+            pp(mom["max_drawdown"] - bench["max_drawdown"]), border=True,
+            help="Perdita massima dal picco più alto raggiunto in precedenza.")
 k[3].metric("Volatilità", f"{mom['volatility']:.1%}",
-            pp(mom["volatility"] - bench["volatility"]), delta_color="inverse", border=True)
+            pp(mom["volatility"] - bench["volatility"]), delta_color="inverse", border=True,
+            help="Quanto oscillano i rendimenti, annualizzato. Più bassa = percorso più tranquillo.")
 k[4].metric("Turnover / anno", f"{mom['turnover_yr']:.2f}×",
-            f"costi {mom['cost_yr']:.2%} / anno", delta_color="off", border=True)
+            f"costi {mom['cost_yr']:.2%} / anno", delta_color="off", border=True,
+            help="Quanto capitale viene scambiato in un anno: 1× = l'intero portafoglio. "
+                 "Più turnover significa più costi e, in Italia, più tasse.")
 
 
 # --- Equity + classifica -------------------------------------------------------
@@ -283,6 +319,17 @@ with tab_metrics:
             "max_drawdown": pct("Max DD"), "max_dd_duration": num("Durata max DD (gg)", "%d"),
             "calmar": num("Calmar"), "turnover_yr": num("Turnover/anno"),
             "cost_yr": pct("Costi/anno", 3), "invested": pct("Investito", 0),
+        } | {
+            # Spiegazioni al passaggio del mouse sull'intestazione
+            k: st.column_config.NumberColumn(cfg_label, format=fmt, help=tip)
+            for k, cfg_label, fmt, tip in [
+                ("sharpe_se", "± SE", "%.2f", "Errore standard dello Sharpe: la sua incertezza."),
+                ("sortino", "Sortino", "%.2f", "Come lo Sharpe, ma penalizza solo le oscillazioni al ribasso."),
+                ("max_dd_duration", "Durata max DD (gg)", "%d",
+                 "Giorni di borsa consecutivi passati sotto il massimo precedente."),
+                ("calmar", "Calmar", "%.2f", "CAGR diviso per il max drawdown: rendimento per unità di perdita peggiore."),
+                ("invested", "Investito", "%.0f%%", "Quota media del capitale investita (il resto è liquidità)."),
+            ]
         },
     )
 

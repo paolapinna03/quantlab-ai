@@ -48,6 +48,25 @@ st.html(header(
             (f"Holdout {HOLDOUT_START[:4]}+ bloccato", "lock")],
 ))
 
+with st.expander("Come funziona la ricerca"):
+    st.markdown(f"""
+Il sistema combina in automatico **ingressi** (rotture dei massimi, momentum, incroci di medie,
+discese brevi, vicinanza ai massimi annuali), **filtri di trend**, **uscite**, **stop**, **target**
+e **uscite a tempo**. Le combinazioni possibili sono {f"{cfg['space_size']:,}".replace(",", ".")}; ne prova
+{cfg['tested']} scelte a caso (seme {cfg['seed']}, quindi la scelta è riproducibile).
+
+1. **Ricerca (fino al {cfg['train_end']})**: ogni candidata viene testata solo su questi anni.
+   Quelle con meno di {cfg['min_trades']} operazioni vengono scartate (troppo poche per giudicare),
+   le altre ordinate per Sharpe.
+2. **Conferma ({cfg['confirm_start']} → {cfg['confirm_end']})**: le migliori {cfg['top_k']}
+   vengono provate su anni **mai usati per sceglierle** e giudicate con i criteri di promozione.
+3. **Verifica finale (dal {HOLDOUT_START[:4]})**: riservata, non ancora usata.
+
+Perché due fasi? Se provi molte combinazioni, la migliore sembra buona anche per puro caso.
+Il grafico "Training → conferma" mostra quanto si sgonfiano le candidate su dati nuovi.
+Ogni candidata viene registrata e conta come tentativo.
+""")
+
 k = st.columns(4)
 k[0].metric("Spazio di ricerca", f"{cfg['space_size']:,}".replace(",", "."), "combinazioni possibili",
             delta_color="off", border=True)
@@ -82,8 +101,11 @@ with left, st.container(border=True):
         for _, r in confirmed.iterrows()
     )
     st.html(f"""<table class="ql-table ql-crit">
-      <thead><tr><th>Strategia</th><th>Sharpe train</th><th>Sharpe conf.</th>
-      <th>Max DD</th><th>Op.</th><th>Criteri</th><th>Esito</th></tr></thead>
+      <thead><tr><th>Strategia</th><th title="Sharpe sugli anni usati per scegliere">Sharpe training</th>
+      <th title="Sharpe sugli anni mai usati per scegliere">Sharpe conferma</th>
+      <th title="Perdita massima dal picco, nel periodo di conferma">Max DD</th>
+      <th title="Operazioni chiuse nel periodo di conferma">Operazioni</th>
+      <th>Criteri</th><th>Esito</th></tr></thead>
       <tbody>{rows}</tbody></table>
       <div class="ql-note">Ordinate per Sharpe sul training, cioè come le ha scelte il sistema.
       Il verdetto usa solo il periodo di conferma.</div>""")

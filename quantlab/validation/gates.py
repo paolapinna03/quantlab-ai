@@ -21,7 +21,8 @@ from quantlab.backtest import BacktestConfig
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.experiments.runner import load_closes
 from quantlab.metrics import sharpe_ratio
-from quantlab.strategies.catalog import get_strategy
+from quantlab.strategies.catalog import get_strategy, is_swing
+from quantlab.swing import SwingConfig
 from quantlab.validation.stats import deflated_sharpe_ratio, sharpe_difference_test
 from quantlab.validation.walkforward import walk_forward
 
@@ -140,15 +141,21 @@ def validate_candidate(
     ))
 
     # 5. Costi realistici e pessimistici.
-    stressed = run_experiment(
-        replace(spec, cost_bps=spec.cost_bps * criteria.cost_multiplier, eval_start=start),
-        prices=prices, ohlc=ohlc,
-    )
+    # Per le strategie swing va moltiplicato anche lo slippage, che è un costo a parte:
+    # altrimenti "costi ×3" sarebbe in realtà circa ×2.
+    mult = criteria.cost_multiplier
+    stressed_spec = replace(spec, cost_bps=spec.cost_bps * mult, eval_start=start)
+    total_bps = spec.cost_bps
+    if is_swing(spec.strategy):
+        slip = SwingConfig(**spec.engine).slippage_bps
+        stressed_spec = replace(stressed_spec, engine=spec.engine | {"slippage_bps": slip * mult})
+        total_bps += slip
+    stressed = run_experiment(stressed_spec, prices=prices, ohlc=ohlc)
     s_sharpe = float(stressed.metrics["sharpe"])
     checks.append(Check(
-        "Costi ×{:g}".format(criteria.cost_multiplier), s_sharpe,
+        "Costi ×{:g}".format(mult), s_sharpe,
         f"> {criteria.min_stressed_sharpe}", bool(s_sharpe > criteria.min_stressed_sharpe),
-        f"Sharpe con costi di {spec.cost_bps * criteria.cost_multiplier:g} bp per lato.",
+        f"Sharpe con costi totali di {total_bps * mult:g} bp per lato invece di {total_bps:g}.",
     ))
 
     # 6. Vincolo di rischio.

@@ -65,7 +65,7 @@ def run_experiment(
                 ohlc = {t: load_prices(t, end=spec.eval_end) for t in spec.universe}
             data = {t: ohlc[t].loc[: spec.eval_end] for t in spec.universe}
             prices = pd.DataFrame({t: d["close"] for t, d in data.items()})
-            data_info = data_fingerprint(prices)
+            data_info = ohlc_fingerprint(data)
             signals = get_strategy(spec.strategy)(data, **spec.params)
             result = run_swing_backtest(data, signals,
                                         SwingConfig(cost_bps=spec.cost_bps, **spec.engine))
@@ -151,6 +151,16 @@ def data_fingerprint(prices: pd.DataFrame) -> dict:
     return out
 
 
+def ohlc_fingerprint(data: dict[str, pd.DataFrame]) -> dict:
+    """Come data_fingerprint, ma su open/high/low/close: le strategie swing li usano tutti."""
+    out = data_fingerprint(pd.DataFrame({t: d["close"] for t, d in data.items()}))
+    for t, d in data.items():
+        frame = d[["open", "high", "low", "close"]].dropna(how="all")
+        digest = hashlib.sha256(pd.util.hash_pandas_object(frame, index=True).values.tobytes())
+        out[t] |= {"sha256": digest.hexdigest()[:16], "fields": "ohlc"}
+    return out
+
+
 def git_version() -> tuple[str | None, bool | None]:
     """(commit corrente, ci sono modifiche non salvate?) oppure (None, None) fuori da Git."""
     try:
@@ -188,7 +198,12 @@ def reproduce(
     if prices is None:
         prices = load_closes(spec.universe, end=spec.eval_end)
     outcome = run_experiment(spec, registry=None, prices=prices)
-    fresh = data_fingerprint(prices.loc[: spec.eval_end, list(spec.universe)])
+    if is_swing(spec.strategy) and all(
+        record.data.get(t, {}).get("fields") == "ohlc" for t in spec.universe
+    ):
+        fresh = ohlc_fingerprint({t: load_prices(t, end=spec.eval_end) for t in spec.universe})
+    else:
+        fresh = data_fingerprint(prices.loc[: spec.eval_end, list(spec.universe)])
     changed = any(fresh[t]["sha256"] != record.data.get(t, {}).get("sha256") for t in fresh)
     keys = ["cagr", "volatility", "sharpe", "max_drawdown"]
     return pd.DataFrame({

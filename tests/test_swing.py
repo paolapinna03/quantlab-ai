@@ -231,3 +231,33 @@ def test_swing_runs_through_registry(tmp_path):
                                       universe=("AAA",), engine={"leva": 3}), reg, ohlc=ohlc)
     with pytest.raises(ValueError, match="solo per le strategie swing"):
         run_experiment(ExperimentSpec(family="x", strategy="buy_and_hold", engine={"max_positions": 2}))
+
+
+# --- Correzioni della revisione ---------------------------------------------------
+
+def test_fingerprint_detects_changes_in_high_low():
+    from quantlab.experiments.runner import data_fingerprint, ohlc_fingerprint
+    df = bars([(100, 102, 98, 101)] * 10)
+    changed = df.copy()
+    changed.iloc[5, changed.columns.get_loc("high")] = 110       # cambia solo il massimo
+    closes = lambda d: pd.DataFrame({"A": d["close"]})
+    assert data_fingerprint(closes(df))["A"]["sha256"] == data_fingerprint(closes(changed))["A"]["sha256"]
+    assert ohlc_fingerprint({"A": df})["A"]["sha256"] != ohlc_fingerprint({"A": changed})["A"]["sha256"]
+
+
+def test_cost_stress_also_triples_swing_slippage(tmp_path):
+    from quantlab.validation import validate_candidate
+    rng = np.random.default_rng(4)
+    idx = pd.bdate_range("2010-01-01", "2022-12-30")
+    ohlc = {}
+    for a in ("AAA", "BBB"):
+        c = 100 * np.cumprod(1 + rng.normal(0.0003, 0.012, len(idx)))
+        o = np.r_[c[0], c[:-1]]
+        ohlc[a] = pd.DataFrame({"open": o, "high": np.maximum(o, c) * 1.01,
+                                "low": np.minimum(o, c) * 0.99, "close": c}, index=idx)
+    spec = ExperimentSpec(family="s", strategy="donchian_breakout", universe=("AAA", "BBB"))
+    bench = ExperimentSpec(family="benchmark", strategy="buy_and_hold", params={"rebalance": "M"},
+                           universe=("AAA", "BBB"))
+    report = validate_candidate(spec, bench, ExperimentRegistry(tmp_path / "r.sqlite"), ohlc=ohlc)
+    check = report.table().loc["Costi ×3"]
+    assert "30 bp per lato invece di 10" in check["meaning"]   # 5 commissioni + 5 slippage, ×3
