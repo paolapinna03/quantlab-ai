@@ -13,6 +13,8 @@ from collections.abc import Callable
 
 import streamlit as st
 
+from quantlab.paper.presets import PRESETS as PAPER_PRESETS
+
 UNIVERSE = {
     "SPY": "Azioni USA large cap", "QQQ": "Nasdaq 100", "IWM": "Azioni USA small cap",
     "EFA": "Azioni sviluppati ex-USA", "EEM": "Azioni emergenti",
@@ -69,14 +71,18 @@ METHOD_LABELS = {"risk_parity": "Risk parity (ERC)", "min_variance": "Minima var
                  "mean_variance": "Media-varianza (didattico)"}
 
 
-def _alloc_controls():
+def _alloc_controls(defaults: dict | None = None, prefix: str = "al"):
+    """Controlli dell'allocazione; `defaults` e `prefix` permettono due voci di menu indipendenti."""
+    d = {"method": "risk_parity", "lookback": 252, "max_weight": 0.4, "momentum_filter": 0} | (defaults or {})
     st.html('<div class="ql-section">Allocazione</div>')
-    method = st.selectbox("Metodo", list(METHOD_LABELS), format_func=METHOD_LABELS.get, key="al_m")
-    lb = st.select_slider("Finestra di stima del rischio", [126, 252, 504], value=252,
-                          format_func=lambda d: f"{d // 21} mesi", key="al_lb")
-    cap = st.slider("Peso massimo per ETF", 0.2, 1.0, 0.4, 0.05, key="al_cap",
+    methods = list(METHOD_LABELS)
+    method = st.selectbox("Metodo", methods, index=methods.index(d["method"]),
+                          format_func=METHOD_LABELS.get, key=f"{prefix}_m")
+    lb = st.select_slider("Finestra di stima del rischio", [126, 252, 504], value=d["lookback"],
+                          format_func=lambda x: f"{x // 21} mesi", key=f"{prefix}_lb")
+    cap = st.slider("Peso massimo per ETF", 0.2, 1.0, float(d["max_weight"]), 0.05, key=f"{prefix}_cap",
                     help="Usato da minima varianza e media-varianza.")
-    mom = st.toggle("Filtro momentum 12 mesi", value=False, key="al_mom",
+    mom = st.toggle("Filtro momentum 12 mesi", value=bool(d["momentum_filter"]), key=f"{prefix}_mom",
                     help="Gli ETF con rendimento a 12 mesi negativo vanno in liquidità.")
     return {"method": method, "lookback": lb, "max_weight": cap, "shrinkage": True,
             "momentum_filter": 252 if mom else 0}, {}
@@ -142,7 +148,19 @@ Regole dei "Turtle Traders" descritte da Faith (2007), libro non peer-reviewed; 
 documentato da Hurst, Ooi & Pedersen (2017)."""
 
 
+_PAPER = PAPER_PRESETS["rp_momentum"]["spec"]
+
 PRESETS = {
+    "paper": Preset(
+        key="paper", label="★ Risk parity + momentum (in paper trading)", short="RP + momentum",
+        family="allocazione_etf", strategy=_PAPER["strategy"],
+        hypothesis="Un'allocazione basata sul rischio migliora il rapporto rischio/rendimento "
+                   "rispetto ai pesi uguali, fuori campione e al netto dei costi.",
+        default_universe=list(_PAPER["universe"]),
+        controls=lambda: _alloc_controls(_PAPER["params"], prefix="pp"),
+        reference=_ALLOC_REF, method_md=_alloc_md,
+        grid=lambda p: [p | {"lookback": lb} for lb in (126, 252, 504)],
+    ),
     "momentum": Preset(
         key="momentum", label="Momentum 12 mesi (time-series)", short="Momentum",
         family="tsmom_etf", strategy="time_series_momentum",

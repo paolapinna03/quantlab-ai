@@ -124,7 +124,7 @@ def test_discovery_form_rejects_bad_input():
 @pytest.mark.network
 def test_backtesting_page_all_strategies():
     at = AppTest.from_file(str(APP_DIR / "page_backtesting.py"), default_timeout=300).run()
-    for key in ("momentum", "allocation", "rsi2", "donchian"):
+    for key in ("paper", "momentum", "allocation", "rsi2", "donchian"):
         at.selectbox[0].set_value(key).run()
         assert not at.exception, (key, at.exception)
         assert len(at.metric) == 5
