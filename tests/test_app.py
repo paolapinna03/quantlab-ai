@@ -155,3 +155,22 @@ def test_paper_create_and_run_from_ui(tmp_path, monkeypatch):
     assert store.last_day("ui_conto") is not None
     _button(at, "Elabora i giorni nuovi").click().run()   # nessun giorno nuovo: non duplica
     assert not at.exception and len(store.history("ui_conto")) == 1
+
+
+def test_paper_page_compares_accounts(tmp_path, monkeypatch):
+    from quantlab.paper import PaperStore, RiskLimits, create_account, run_account
+    db = tmp_path / "paper.sqlite"
+    monkeypatch.setenv("QUANTLAB_PAPER_DB", str(db))
+    idx = pd.bdate_range("2019-01-01", periods=420)
+    rng = np.random.default_rng(1)
+    p = pd.DataFrame(100 * np.cumprod(1 + rng.normal(0.0004, 0.01, (420, 2)), axis=0),
+                     index=idx, columns=["AAA", "BBB"])
+    store = PaperStore(db)
+    for name, spec in [("rp", {"strategy": "risk_allocation", "params": {"lookback": 126, "max_weight": 0.7}}),
+                       ("mom", {"strategy": "time_series_momentum", "params": {"lookback": 126}})]:
+        create_account(store, name, spec | {"universe": ["AAA", "BBB"], "cost_bps": 5.0, "cash": "zero"},
+                       10_000, RiskLimits(max_weight=0.7))
+        for k in range(380, 420):
+            run_account(store, name, prices=p.iloc[:k + 1], today=p.index[k])
+    at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
+    assert not at.exception, at.exception

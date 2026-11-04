@@ -156,6 +156,43 @@ k[3].metric("Liquidità", f"{last['cash'] / last['equity']:.0%}", border=True,
 k[4].metric("Giorni di track record", f"{len(hist)}", border=True,
             help="Giorni di borsa elaborati. Per giudicare servono mesi, non giorni.")
 
+# --- Confronto tra i conti -------------------------------------------------------------
+
+if len(accounts) > 1:
+    with st.container(border=True):
+        st.html(card_title("Confronto tra i conti", "dalla prima data comune · stessi prezzi e costi"))
+        hists = {a["name"]: store.history(a["name"]) for a in accounts}
+        hists = {n: h for n, h in hists.items() if len(h)}
+        common = max(h.index[0] for h in hists.values()) if hists else None
+        rows = ""
+        curves = {}
+        for a in accounts:
+            h = hists.get(a["name"])
+            if h is None or common is None:
+                continue
+            e = h["equity"].loc[common:]
+            if e.empty:
+                continue
+            curves[a["name"]] = 100 * e / e.iloc[0]
+            dd = (e / e.cummax() - 1).min()
+            last_row = h.iloc[-1]
+            label = PRESET_LABELS.get(next((k for k, v in PAPER_PRESETS.items()
+                                            if v["spec"] == a["spec"]), ""), a["spec"]["strategy"])
+            rows += (f"<tr><td><span class='name'>{esc(a['name'])}</span>"
+                     f"<span class='why'>{esc(label)}</span></td>"
+                     f"<td>{'attivo' if a['status'] == 'attivo' else 'fermato'}</td>"
+                     f"<td>{e.iloc[-1] / e.iloc[0] - 1:+.2%}</td><td>{dd:.1%}</td>"
+                     f"<td>{last_row['cash'] / last_row['equity']:.0%}</td><td>{len(e)}</td></tr>")
+        st.html(f"""<table class="ql-table ql-crit"><thead><tr><th>Conto</th><th>Stato</th>
+            <th>Rendimento</th><th>Max DD</th><th>Liquidità</th><th>Giorni</th></tr></thead>
+            <tbody>{rows}</tbody></table>
+            <div class="ql-note">Confronto dal {common:%d %b %Y}. Con poche settimane le differenze sono
+            rumore: nel backtest le due strategie hanno correlazione 0,81 e differenza non significativa.</div>""")
+        if curves and max(len(c) for c in curves.values()) >= 2:
+            st.plotly_chart(equity_chart(curves, color_map(list(curves)), log=False),
+                            config=PLOTLY_CONFIG, width="stretch")
+
+
 # --- Andamento e posizioni -----------------------------------------------------------
 
 left, right = st.columns([1.6, 1], gap="medium")
