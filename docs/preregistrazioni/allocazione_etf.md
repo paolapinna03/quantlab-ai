@@ -39,3 +39,25 @@ Deflated Sharpe ≥ 0,95 · Sharpe significativamente > 1/N (p ≤ 0,05) · walk
 Sharpe > 0 in ognuno di 3 sotto-periodi · Sharpe > 0 con costi ×3 · max drawdown ≥ -35%.
 
 Il criterio sul benchmark è il più severo: un esito negativo è atteso e va riportato com'è.
+
+---
+
+## Esito (aggiunto dopo il test, pre-registrazione nel commit d755edc)
+
+Finestra di valutazione 2007-03-12 → 2022-12-30 (9 ETF), `python examples/04_risk_allocation.py`.
+
+| Strategia | CAGR | Vol | Sharpe | Max DD | Turnover/anno | p vs 1/N | Criteri | Verdetto |
+|---|---|---|---|---|---|---|---|---|
+| Inverse volatility | 4,8% | 10,1% | 0,44 | -26,4% | 0,44 | 0,234 | 5/6 | Respinta |
+| Minima varianza (tetto 40%) | 4,6% | 6,8% | 0,59 | -19,2% | 0,91 | 0,175 | 5/6 | Respinta |
+| Risk parity (ERC) | 4,5% | 8,0% | 0,49 | -20,7% | 0,49 | 0,239 | 5/6 | Respinta |
+| Hierarchical Risk Parity | 3,4% | 6,8% | 0,41 | -21,8% | 1,03 | 0,478 | 4/6 | Respinta |
+| Risk parity + momentum 12m | 4,0% | 5,9% | 0,56 | -10,9% | 1,33 | 0,278 | 5/6 | Respinta |
+| Media-varianza (didattico) | 5,4% | 9,7% | 0,51 | -20,7% | 3,93 | 0,317 | 5/6 | Respinta |
+| Pesi uguali 1/N | 5,4% | 13,8% | 0,39 | -38,8% | 0,38 | — | — | — |
+
+Lettura: l'aspettativa dichiarata è confermata. Tutti i metodi riducono volatilità e drawdown
+rispetto a 1/N e hanno Sharpe più alto, ma nessuna differenza di Sharpe è statisticamente
+significativa (p da 0,18 a 0,48). Il criterio fallito è lo stesso per tutti; HRP fallisce anche
+il Deflated Sharpe. La media-varianza non è stata disastrosa qui, ma ha un turnover circa 4–8 volte
+più alto degli altri metodi, segno di pesi instabili.

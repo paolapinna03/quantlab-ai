@@ -22,6 +22,7 @@ python -m quantlab.data SPY QQQ             # scarica e controlla i dati
 python examples/01_momentum_vs_buy_and_hold.py
 python examples/02_validate_momentum.py     # criteri di promozione
 python examples/03_swing_strategies.py      # swing trading: RSI(2) e Donchian
+python examples/04_risk_allocation.py       # allocazione basata sul rischio (pre-registrata)
 python -m quantlab.discovery                # Strategy Discovery (sessione etf_tbill_v1, ~1 min)
 python -m quantlab.experiments              # registro degli esperimenti
 python -m quantlab.experiments --reproduce <id>
