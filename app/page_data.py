@@ -8,11 +8,12 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from styles import card_title, header
+from styles import card_title, criteria_table, header, verdict_block
 from quantlab.config import HOLDOUT_START
 from quantlab.data import DataValidationError, cached_tickers, load_prices
 from quantlab.data.rates import load_tbill_yield
 from quantlab.experiments import ExperimentRegistry, reproduce
+from quantlab.validation import Check, load_record
 
 registry = ExperimentRegistry()
 PREREG_DIR = Path(__file__).resolve().parents[1] / "docs" / "preregistrazioni"
@@ -25,7 +26,43 @@ st.html(header(
              "I backtest di ricerca non usano i dati dal 2023: servono per la verifica finale.")],
 ))
 
-tab_data, tab_reg, tab_pre = st.tabs(["Dati di mercato", "Registro esperimenti", "Pre-registrazioni"])
+tab_final, tab_data, tab_reg, tab_pre = st.tabs(
+    ["Verifica finale", "Dati di mercato", "Registro esperimenti", "Pre-registrazioni"])
+
+# --- Verifica finale --------------------------------------------------------------------
+
+with tab_final:
+    record = load_record()
+    if not record:
+        st.info("Nessuna valutazione finale eseguita. Si fa una sola volta per ipotesi, dopo una "
+                "pre-registrazione salvata su Git (vedi examples/05_final_evaluation.py).")
+    else:
+        st.caption("Dati dal 2023 mai usati nella ricerca, guardati **una sola volta** per ipotesi. "
+                   "Esito salvato in `state/final_evaluations.json`: una seconda valutazione viene rifiutata.")
+        for fam, r in record.items():
+            with st.container(border=True):
+                st.html(card_title(f"Famiglia {fam}", f"holdout {r['window'][0]} → {r['window'][1]} · "
+                                                     f"pre-registrazione {r['prereg']}"))
+                c1, c2 = st.columns([1.5, 1], gap="medium")
+                with c1:
+                    rows = {"In-sample (ricerca)": r["in_sample"], "Holdout": r["holdout"]} | r["benchmarks"]
+                    df = pd.DataFrame(rows).T[["cagr", "volatility", "sharpe", "max_drawdown"]].astype(float)
+                    df[["cagr", "volatility", "max_drawdown"]] *= 100
+                    st.dataframe(df, width="stretch", column_config={
+                        "cagr": st.column_config.NumberColumn("CAGR", format="%.1f%%"),
+                        "volatility": st.column_config.NumberColumn("Volatilità", format="%.1f%%"),
+                        "sharpe": st.column_config.NumberColumn("Sharpe", format="%.2f"),
+                        "max_drawdown": st.column_config.NumberColumn("Max DD", format="%.1f%%")})
+                    tests = " · ".join(f"contro {k}: p = {v['p_value']:.2f}"
+                                       for k, v in r.get("benchmark_tests", {}).items())
+                    st.caption(f"Confronti informativi, non criteri (campione troppo corto): {tests}.")
+                with c2:
+                    st.html(verdict_block(r["verdict"] == "CONFERMATA",
+                                          "Supera i tre criteri pre-registrati." if r["verdict"] == "CONFERMATA"
+                                          else "Non supera i criteri pre-registrati.",
+                                          labels=("CONFERMATA", "NON CONFERMATA")))
+                    st.html(criteria_table([Check(**c) for c in r["checks"]]))
+
 
 # --- Dati -----------------------------------------------------------------------------
 

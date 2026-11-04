@@ -1,0 +1,249 @@
+{
+  "allocazione_etf": {
+    "date": "2026-11-04T12:10:30+00:00",
+    "verdict": "CONFERMATA",
+    "window": [
+      "2023-01-01",
+      "2026-11-03"
+    ],
+    "run_id": "699dee44d6cb",
+    "spec": {
+      "family": "allocazione_etf",
+      "strategy": "risk_allocation",
+      "params": {
+        "method": "risk_parity",
+        "lookback": 252,
+        "max_weight": 0.4,
+        "shrinkage": true,
+        "momentum_filter": 252
+      },
+      "universe": [
+        "SPY",
+        "EFA",
+        "EEM",
+        "IWM",
+        "TLT",
+        "IEF",
+        "GLD",
+        "DBC",
+        "VNQ"
+      ],
+      "eval_start": null,
+      "eval_end": "2022-12-31",
+      "cost_bps": 5.0,
+      "execution_lag": 1,
+      "hypothesis": "",
+      "final_evaluation": false,
+      "engine": {},
+      "cash": "tbill"
+    },
+    "prereg": "finale_holdout_2026.md",
+    "commit": "5877b401b854475ab7dd5bb02dc52b19905e9db3",
+    "dirty": true,
+    "in_sample": {
+      "start": "2007-03-12",
+      "end": "2022-12-30",
+      "cagr": 0.039763773016019854,
+      "volatility": 0.05900321111446911,
+      "sharpe": 0.5550622776660183,
+      "sharpe_se": 0.2516415453967697,
+      "max_drawdown": -0.10895109730522534,
+      "cash_rate": 0.008020681304901967,
+      "turnover_yr": 1.3339656381678717,
+      "invested": 0.6931959347999682
+    },
+    "holdout": {
+      "start": "2023-01-03",
+      "end": "2026-11-03",
+      "cagr": 0.08381805868086145,
+      "volatility": 0.06685296624380438,
+      "sharpe": 0.5836783158855006,
+      "sharpe_se": 0.5117217289907727,
+      "max_drawdown": -0.07357313099759888,
+      "cash_rate": 0.04467751406580467,
+      "turnover_yr": 1.7190128143034058,
+      "invested": 0.7095495054720667
+    },
+    "benchmarks": {
+      "Pesi uguali 1/N": {
+        "start": "2023-01-03",
+        "end": "2026-11-03",
+        "cagr": 0.12498850427007446,
+        "volatility": 0.10208194319618842,
+        "sharpe": 0.7766853099512324,
+        "sharpe_se": 0.5118549127927764,
+        "max_drawdown": -0.09798874626754595,
+        "cash_rate": 0.04467751406580467,
+        "turnover_yr": 0.30668153679407656,
+        "invested": 1.0
+      },
+      "SPY buy & hold": {
+        "start": "2023-01-03",
+        "end": "2026-11-03",
+        "cagr": 0.20941559030226586,
+        "volatility": 0.1484363018680749,
+        "sharpe": 1.0607497466644995,
+        "sharpe_se": 0.5121195698303712,
+        "max_drawdown": -0.18755225912218998,
+        "cash_rate": 0.04467751406580467,
+        "turnover_yr": 0.0,
+        "invested": 1.0
+      }
+    },
+    "benchmark_tests": {
+      "Pesi uguali 1/N": {
+        "p_value": 0.8126061514318847,
+        "correlation": 0.9098341846703265
+      },
+      "SPY buy & hold": {
+        "p_value": 0.8807869833223487,
+        "correlation": 0.6879865163931629
+      }
+    },
+    "checks": [
+      {
+        "name": "Sharpe sopra il T-bill",
+        "value": 0.5836783158855006,
+        "threshold": "> 0",
+        "passed": true,
+        "meaning": "Rendimento in eccesso sulla liquidità per unità di rischio, sugli anni mai usati."
+      },
+      {
+        "name": "Max drawdown",
+        "value": -0.07357313099759888,
+        "threshold": "≥ -20%",
+        "passed": true,
+        "meaning": "Stesso limite che fa scattare l'arresto automatico nel paper trading."
+      },
+      {
+        "name": "Nessun crollo rispetto al backtest",
+        "value": 0.5836783158855006,
+        "threshold": "≥ -0.47",
+        "passed": true,
+        "meaning": "Sharpe in-sample 0.56 meno 2 errori standard dell'holdout (0.51)."
+      }
+    ]
+  },
+  "tsmom_etf": {
+    "date": "2026-11-04T12:10:32+00:00",
+    "verdict": "CONFERMATA",
+    "window": [
+      "2023-01-01",
+      "2026-11-03"
+    ],
+    "run_id": "59cf46b7e072",
+    "spec": {
+      "family": "tsmom_etf",
+      "strategy": "time_series_momentum",
+      "params": {
+        "lookback": 252,
+        "long_only": true
+      },
+      "universe": [
+        "SPY",
+        "EFA",
+        "EEM",
+        "IWM",
+        "TLT",
+        "IEF",
+        "GLD",
+        "DBC",
+        "VNQ"
+      ],
+      "eval_start": null,
+      "eval_end": "2022-12-31",
+      "cost_bps": 5.0,
+      "execution_lag": 1,
+      "hypothesis": "",
+      "final_evaluation": false,
+      "engine": {},
+      "cash": "tbill"
+    },
+    "prereg": "finale_holdout_2026.md",
+    "commit": "5877b401b854475ab7dd5bb02dc52b19905e9db3",
+    "dirty": true,
+    "in_sample": {
+      "start": "2007-03-12",
+      "end": "2022-12-30",
+      "cagr": 0.04196310534258729,
+      "volatility": 0.07911474558320095,
+      "sharpe": 0.45822773998306093,
+      "sharpe_se": 0.2516170636961154,
+      "max_drawdown": -0.140547953086971,
+      "cash_rate": 0.008020681304901967,
+      "turnover_yr": 1.401651228748353,
+      "invested": 0.6554336392101029
+    },
+    "holdout": {
+      "start": "2023-01-03",
+      "end": "2026-11-03",
+      "cagr": 0.09896341926003971,
+      "volatility": 0.08366293505793759,
+      "sharpe": 0.6474140533745354,
+      "sharpe_se": 0.5117615338990066,
+      "max_drawdown": -0.08923814991646994,
+      "cash_rate": 0.04467751406580467,
+      "turnover_yr": 1.4998900059392737,
+      "invested": 0.7351503556694923
+    },
+    "benchmarks": {
+      "Pesi uguali 1/N": {
+        "start": "2023-01-03",
+        "end": "2026-11-03",
+        "cagr": 0.12498850427007446,
+        "volatility": 0.10208194319618842,
+        "sharpe": 0.7766853099512324,
+        "sharpe_se": 0.5118549127927764,
+        "max_drawdown": -0.09798874626754595,
+        "cash_rate": 0.04467751406580467,
+        "turnover_yr": 0.30668153679407656,
+        "invested": 1.0
+      },
+      "SPY buy & hold": {
+        "start": "2023-01-03",
+        "end": "2026-11-03",
+        "cagr": 0.20941559030226586,
+        "volatility": 0.1484363018680749,
+        "sharpe": 1.0607497466644995,
+        "sharpe_se": 0.5121195698303712,
+        "max_drawdown": -0.18755225912218998,
+        "cash_rate": 0.04467751406580467,
+        "turnover_yr": 0.0,
+        "invested": 1.0
+      }
+    },
+    "benchmark_tests": {
+      "Pesi uguali 1/N": {
+        "p_value": 0.7423526390980868,
+        "correlation": 0.9247299424799277
+      },
+      "SPY buy & hold": {
+        "p_value": 0.8702051774033144,
+        "correlation": 0.7439306052398833
+      }
+    },
+    "checks": [
+      {
+        "name": "Sharpe sopra il T-bill",
+        "value": 0.6474140533745354,
+        "threshold": "> 0",
+        "passed": true,
+        "meaning": "Rendimento in eccesso sulla liquidità per unità di rischio, sugli anni mai usati."
+      },
+      {
+        "name": "Max drawdown",
+        "value": -0.08923814991646994,
+        "threshold": "≥ -20%",
+        "passed": true,
+        "meaning": "Stesso limite che fa scattare l'arresto automatico nel paper trading."
+      },
+      {
+        "name": "Nessun crollo rispetto al backtest",
+        "value": 0.6474140533745354,
+        "threshold": "≥ -0.57",
+        "passed": true,
+        "meaning": "Sharpe in-sample 0.46 meno 2 errori standard dell'holdout (0.51)."
+      }
+    ]
+  }
+}

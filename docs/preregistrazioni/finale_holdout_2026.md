@@ -40,3 +40,28 @@ confronto con pesi uguali 1/N sugli stessi ETF e con buy-and-hold SPY (Sharpe, C
 Incerta. La ricerca raccolta indica un 2023-2025 debole per il trend following dei CTA professionali;
 la risk parity con filtro momentum ha avuto in-sample uno Sharpe di 0,56 su 2007-2022. Un esito negativo
 è plausibile e verrà riportato com'è. L'esito non modifica i conti di paper trading già avviati.
+
+---
+
+## Esito (aggiunto dopo l'esecuzione, pre-registrazione nel commit 5877b40)
+
+Holdout 2023-01-01 → 2026-11-03. Dati completi in `state/final_evaluations.json`.
+
+| | CAGR | Vol | Sharpe | Max DD | Verdetto |
+|---|---|---|---|---|---|
+| **RP + momentum** in-sample (2007-2022) | 4,0% | 5,9% | 0,56 | -10,9% | |
+| **RP + momentum** holdout | 8,4% | 6,7% | 0,58 | -7,4% | **CONFERMATA** (3/3) |
+| **Momentum 9 ETF** in-sample (2007-2022) | 4,2% | 7,9% | 0,46 | -14,1% | |
+| **Momentum 9 ETF** holdout | 9,9% | 8,4% | 0,65 | -8,9% | **CONFERMATA** (3/3) |
+| Pesi uguali 1/N, holdout | 12,5% | 10,2% | 0,78 | -9,8% | — |
+| SPY buy & hold, holdout | 20,9% | 14,8% | 1,06 | -18,8% | — |
+
+Lettura:
+- Su anni mai usati, entrambe le strategie si sono comportate **come nel backtest o meglio**: Sharpe
+  positivo e simile (0,58 e 0,65 contro 0,56 e 0,46), drawdown contenuti (-7% e -9%).
+- In assoluto hanno reso **meno** di 1/N e molto meno di SPY, in un periodo di forte rialzo azionario.
+  È coerente con strategie difensive che tengono parte del capitale in liquidità; le differenze non sono
+  statisticamente significative (p da 0,74 a 0,88).
+- Il terzo criterio si è rivelato poco severo: con meno di 4 anni l'errore standard dello Sharpe è circa
+  0,5, quindi la soglia era negativa. "Confermata" significa che la strategia non si è rotta fuori
+  campione, non che sia migliore delle alternative.

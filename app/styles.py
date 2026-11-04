@@ -132,8 +132,8 @@ def criteria_table(checks) -> str:
       <tbody>{rows}</tbody></table>"""
 
 
-def verdict_block(promoted: bool, text: str) -> str:
+def verdict_block(promoted: bool, text: str, labels: tuple[str, str] = ("PROMOSSA", "RESPINTA")) -> str:
     cls = "ok" if promoted else "ko"
-    label = "✓ PROMOSSA" if promoted else "✗ RESPINTA"
+    label = f"✓ {labels[0]}" if promoted else f"✗ {labels[1]}"
     return (f'<div class="ql-verdict {cls}">{label}</div>'
             f'<div class="ql-verdict-text">{esc(text)}</div>')
