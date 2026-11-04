@@ -31,9 +31,18 @@ PRESETS = {
                 "di rp_momentum: nel backtest 2007-2022 rendimento simile, rischio più alto "
                 "(correlazione 0,81, differenza non significativa).",
     },
+    "ai_analyst": {
+        "spec": {
+            "strategy": "ai_ideas", "params": {},
+            "universe": ETF_9, "cost_bps": DEFAULT_COST_BPS, "cash": DEFAULT_CASH,
+        },
+        "note": "Idee proprie dell'analista AI (Claude), registrate per misurarne nel tempo il valore. "
+                "Non è una strategia validata: è un esperimento.",
+    },
 }
 
 PRESET_LABELS = {
     "rp_momentum": "Risk parity + momentum 12 mesi (9 ETF multi-asset)",
     "tsmom_9etf": "Momentum 12 mesi, pesi uguali (stessi 9 ETF)",
+    "ai_analyst": "Idee dell'analista AI (esperimento, stessi 9 ETF)",
 }

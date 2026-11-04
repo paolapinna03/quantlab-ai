@@ -17,7 +17,7 @@ on:
         description: "Conto (solo per ferma / ferma_e_vendi / riattiva)"
         type: choice
         default: rp_momentum
-        options: [rp_momentum, tsmom_9etf]
+        options: [rp_momentum, tsmom_9etf, ai_analyst]
 
 permissions:
   contents: write          # serve per salvare lo stato con un commit
@@ -56,8 +56,20 @@ jobs:
           esac
 
       - name: Elabora i giorni nuovi
+        run: python -m quantlab.paper run | tee run.log
+
+      - name: Analista AI e messaggio Telegram
+        if: github.event_name == 'schedule' || inputs.azione == 'elabora'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        # Un problema dell'analista non deve impedire di salvare lo stato dei conti.
+        continue-on-error: true
+        run: python -m quantlab.analyst run
+
+      - name: Esporta e riepiloga
         run: |
-          python -m quantlab.paper run | tee run.log
           python -m quantlab.paper export
           python -m quantlab.paper status >> "$GITHUB_STEP_SUMMARY"
 

@@ -11,5 +11,8 @@ yfinance>=0.2.40
 streamlit>=1.35
 plotly>=5.20
 
+# Analista AI giornaliero (Claude API)
+anthropic>=2.0
+
 # Test
 pytest>=8.0

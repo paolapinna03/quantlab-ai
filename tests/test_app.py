@@ -189,3 +189,8 @@ def test_paper_page_automated_mode(tmp_path, monkeypatch):
     labels = {b.label for b in at.button}
     assert not labels & {"Crea il conto", "Elabora i giorni nuovi", "Ferma", "Ferma e vendi tutto"}
     assert any("Automazione attiva" in i.value for i in at.info)
+
+
+def test_analyst_page_renders_without_briefings():
+    at = AppTest.from_file(str(APP_DIR / "page_analyst.py"), default_timeout=60).run()
+    assert not at.exception, at.exception

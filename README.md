@@ -35,6 +35,10 @@ streamlit run app/streamlit_app.py
   quindi datato e verificabile nella storia di Git. In locale: `git pull` e la dashboard mostra
   l'ultima giornata. Per elaborare subito o fermare un conto: Actions → *Paper trading giornaliero* →
   *Run workflow*.
+- **Analista AI** (stesso workflow, dopo l'elaborazione): resoconto serale con le operazioni delle
+  strategie, i segnali e il commento di Claude, inviato su Telegram e salvato in `state/briefings/`.
+  Le idee proprie dell'AI vanno nel conto simulato `ai_analyst`, per misurarne il valore nel tempo.
+  Secret necessari: `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - **Test** (`.github/workflows/tests.yml`): `pytest` a ogni push.
 
 I comandi da terminale restano disponibili:

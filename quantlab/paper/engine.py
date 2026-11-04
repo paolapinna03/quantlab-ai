@@ -56,6 +56,11 @@ def next_weekday(ts: pd.Timestamp) -> pd.Timestamp:
     return d
 
 
+# Strategie "esterne": i pesi non li calcola una regola del catalogo, li imposta ogni giorno
+# un altro componente (l'analista AI) tramite gli ordini in attesa.
+EXTERNAL_STRATEGIES = {"ai_ideas"}
+
+
 def live_targets(spec: dict, prices: pd.DataFrame) -> pd.DataFrame:
     """Pesi target della strategia, calcolati come dal vivo.
 
@@ -64,6 +69,8 @@ def live_targets(spec: dict, prices: pd.DataFrame) -> pd.DataFrame:
     noto in anticipo), non contiene alcun prezzo. Approssimazione dichiarata:
     le festività di borsa non sono considerate.
     """
+    if spec["strategy"] in EXTERNAL_STRATEGIES:
+        return pd.DataFrame(np.nan, index=prices.index, columns=prices.columns)
     phantom = pd.DataFrame(np.nan, index=[next_weekday(prices.index[-1])], columns=prices.columns)
     extended = pd.concat([prices, phantom])
     return get_strategy(spec["strategy"])(extended, **spec.get("params", {})).iloc[:-1]
@@ -71,9 +78,10 @@ def live_targets(spec: dict, prices: pd.DataFrame) -> pd.DataFrame:
 
 def create_account(store: PaperStore, name: str, spec: dict, capital: float = 10_000.0,
                    limits: RiskLimits | None = None, note: str = "") -> None:
-    if is_swing(spec["strategy"]):
-        raise ValueError("per ora il paper trading supporta le strategie di portafoglio, non quelle swing")
-    get_strategy(spec["strategy"])  # verifica che esista
+    if spec["strategy"] not in EXTERNAL_STRATEGIES:
+        if is_swing(spec["strategy"]):
+            raise ValueError("per ora il paper trading supporta le strategie di portafoglio, non quelle swing")
+        get_strategy(spec["strategy"])  # verifica che esista
     store.create_account(name, spec, capital, vars(limits or RiskLimits()), note)
 
 
