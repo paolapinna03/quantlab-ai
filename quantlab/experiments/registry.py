@@ -182,6 +182,10 @@ class ExperimentRegistry:
         with closing(self._connect()) as con:
             rows = con.execute(query, args).fetchall()
         records = [_to_record(r) for r in rows]
+        columns = ["id", "created_at", "family", "strategy", "params", "universe", "status",
+                   "final", "sharpe", "cagr", "max_drawdown", "commit"]
+        if not records:          # tabella vuota ma con le colonne: chi la usa non deve cambiare codice
+            return pd.DataFrame(columns=columns)
         return pd.DataFrame([
             {
                 "id": r.id, "created_at": r.created_at, "family": r.family,

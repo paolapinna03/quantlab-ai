@@ -1,9 +1,4 @@
-"""Pagina Paper Trading: il conto simulato che gira ogni giorno su dati nuovi.
-
-La pagina mostra lo stato salvato; l'elaborazione giornaliera si avvia da
-terminale (python -m quantlab.paper run). L'unica azione disponibile qui è
-il pulsante di emergenza, che ferma il conto.
-"""
+"""Pagina Paper Trading: crea conti simulati, elabora i giorni nuovi, ferma in emergenza."""
 
 from __future__ import annotations
 
@@ -12,20 +7,62 @@ import streamlit as st
 
 from charts import PLOTLY_CONFIG, color_map, drawdown_chart, equity_chart
 from styles import card_title, esc, header
-from quantlab.paper import PaperStore, halt, resume
+import re
+
+from quantlab.paper import PaperStore, RiskLimits, create_account, halt, resume, run_account
+from quantlab.paper.presets import PRESET_LABELS
+from quantlab.paper.presets import PRESETS as PAPER_PRESETS
 
 store = PaperStore()
 accounts = store.accounts()
 
+
+def create_form(expanded: bool) -> None:
+    with st.expander("➕ Nuovo conto simulato", expanded=expanded):
+        with st.form("nuovo_conto"):
+            c1, c2, c3 = st.columns([1.2, 2, 1])
+            new = c1.text_input("Nome del conto", value="rp_momentum" if not accounts else "")
+            preset = c2.selectbox("Strategia", list(PAPER_PRESETS),
+                                  format_func=lambda k: PRESET_LABELS.get(k, k))
+            capital = c3.number_input("Capitale simulato", 1_000.0, 1_000_000.0, 10_000.0, 1_000.0)
+            go = st.form_submit_button("Crea il conto", type="primary")
+        if not go:
+            return
+        if not re.fullmatch(r"[A-Za-z0-9_]{2,40}", new or ""):
+            st.error("Il nome può contenere solo lettere, numeri e _ (da 2 a 40 caratteri).")
+            return
+        try:
+            create_account(store, new, PAPER_PRESETS[preset]["spec"], capital, RiskLimits(),
+                           PAPER_PRESETS[preset]["note"])
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+        with st.spinner("Scarico i prezzi e avvio il primo giorno…"):
+            run_account(store, new)
+        st.session_state["paper_account"] = new
+        st.rerun()
+
+
 if not accounts:
     st.html(header("Paper Trading", "Nessun conto simulato", "Soldi simulati, prezzi reali.",
                    [("Soldi simulati", "lock")]))
-    st.info("Crea il primo conto e avvia la prima giornata da terminale:\n\n"
-            "`python -m quantlab.paper create`\n\n`python -m quantlab.paper run`")
+    st.info("Crea il primo conto: la strategia girerà ogni giorno su prezzi reali e nuovi, "
+            "con soldi simulati. Nessun ordine viene inviato a un broker.")
+    create_form(expanded=True)
     st.stop()
 
 with st.sidebar:
-    name = st.selectbox("Conto", [a["name"] for a in accounts])
+    names = [a["name"] for a in accounts]
+    default = st.session_state.get("paper_account")
+    name = st.selectbox("Conto", names, index=names.index(default) if default in names else 0)
+    st.html('<div class="ql-section">Giornata</div>')
+    if st.button("Elabora i giorni nuovi", type="primary", width="stretch",
+                 help="Scarica i prezzi aggiornati, esegue gli ordini in attesa e calcola i segnali. "
+                      "Da usare una volta al giorno dopo le 22:30 italiane; i giorni saltati vengono recuperati."):
+        with st.spinner("Scarico i prezzi ed elaboro…"):
+            summary = run_account(store, name)
+        st.session_state["paper_summary"] = summary
+        st.rerun()
 acc = store.account(name)
 spec, limits = acc["spec"], acc["limits"]
 hist = store.history(name)
@@ -76,8 +113,8 @@ st.html(header(
 
 with st.expander("Come funziona"):
     st.markdown(f"""
-- **Ogni giorno dopo le 22:30 italiane** (chiusura di New York) esegui `python -m quantlab.paper run`.
-  Se salti dei giorni, al successivo avvio vengono recuperati in ordine.
+- **Ogni giorno dopo le 22:30 italiane** (chiusura di New York) premi **"Elabora i giorni nuovi"**
+  nella barra laterale. Se salti dei giorni, vengono recuperati in ordine; premerlo due volte non duplica nulla.
 - **Tempistica identica al backtest**: i pesi decisi alla chiusura di un giorno vengono eseguiti alla
   chiusura successiva. Un test verifica che il paper trading e il backtest diano gli stessi rendimenti.
 - **La strategia ribilancia a fine mese.** Negli altri giorni le posizioni si muovono solo con i prezzi.
@@ -89,8 +126,18 @@ with st.expander("Come funziona"):
   quando la strategia è stata scelta.
 """)
 
+summary = st.session_state.pop("paper_summary", None)
+if summary is not None:
+    days = ", ".join(f"{d:%d %b}" for d in summary.processed) or "nessun giorno nuovo"
+    st.success(f"Elaborazione completata · giorni: {days} · ordini eseguiti {summary.filled}, "
+               f"bloccati {summary.blocked}")
+    for m in summary.messages:
+        st.info(m)
+
+create_form(expanded=False)
+
 if not last:
-    st.info("Il conto esiste ma non è ancora stato elaborato: `python -m quantlab.paper run`.")
+    st.info("Il conto esiste ma non è ancora stato elaborato: usa \"Elabora i giorni nuovi\".")
     st.stop()
 
 # --- KPI ---------------------------------------------------------------------------

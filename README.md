@@ -13,23 +13,28 @@ Piattaforma di ricerca quantitativa assistita da AI per scoprire, testare e vali
    python -c "import pandas, yfinance, streamlit; print('OK')"
    ```
 
-## Comandi principali
+## Come si usa
+
+Tutto si fa dalla dashboard:
+
+```bash
+streamlit run app/streamlit_app.py
+```
+
+| Pagina | Cosa ci fai |
+|---|---|
+| Backtesting | scegli una strategia (momentum, allocazione per rischio, swing), l'universo e i parametri; vedi risultati, criteri di promozione e verdetto |
+| Strategy Discovery | avvii una ricerca automatica di strategie e ne vedi la conferma su dati mai usati |
+| Paper Trading | crei un conto simulato, elabori i giorni nuovi, fermi il conto in emergenza |
+| Dati e registro | aggiorni i prezzi, aggiungi ETF, consulti e riproduci ogni esperimento, leggi le pre-registrazioni |
+
+I comandi da terminale restano disponibili per l'automazione:
 
 ```bash
 pytest                                      # test offline (veloci)
 pytest -m network                           # test con dati reali
-python -m quantlab.data SPY QQQ             # scarica e controlla i dati
-python examples/01_momentum_vs_buy_and_hold.py
-python examples/02_validate_momentum.py     # criteri di promozione
-python examples/03_swing_strategies.py      # swing trading: RSI(2) e Donchian
-python examples/04_risk_allocation.py       # allocazione basata sul rischio (pre-registrata)
-python -m quantlab.discovery                # Strategy Discovery (sessione etf_tbill_v1, ~1 min)
-python -m quantlab.experiments              # registro degli esperimenti
-python -m quantlab.experiments --reproduce <id>
-python -m quantlab.paper create             # crea il conto simulato rp_momentum
-python -m quantlab.paper run                # ogni giorno dopo le 22:30 italiane
-python -m quantlab.paper status
-streamlit run app/streamlit_app.py          # dashboard: Backtesting, Discovery, Paper Trading
+python -m quantlab.paper run                # elaborazione giornaliera del paper trading
+python -m quantlab.discovery --name etf_v2  # ricerca automatica
 ```
 
 ## Principi

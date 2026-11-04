@@ -153,3 +153,17 @@ def cache_info(ticker: str, cache_dir: Path | str | None = None) -> dict | None:
     if not meta_path.exists():
         return None
     return json.loads(meta_path.read_text())
+
+
+def cached_tickers(cache_dir: Path | str | None = None) -> pd.DataFrame:
+    """Elenco dei ticker in cache con le informazioni del download."""
+    cache_dir = Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE_DIR
+    rows = []
+    for meta in sorted(cache_dir.glob("*.meta.json")):
+        info = json.loads(meta.read_text())
+        if "ticker" not in info:          # es. la serie dei tassi, che ha un formato suo
+            continue
+        rows.append({"ticker": info["ticker"], "first_date": info.get("first_date"),
+                     "last_date": info.get("last_date"), "rows": info.get("rows"),
+                     "fetched_at": info.get("fetched_at"), "warnings": len(info.get("warnings", []))})
+    return pd.DataFrame(rows, columns=["ticker", "first_date", "last_date", "rows", "fetched_at", "warnings"])

@@ -1,8 +1,7 @@
-"""Pagina Strategy Discovery: risultati delle ricerche automatiche di strategie.
+"""Pagina Strategy Discovery: avvio e risultati delle ricerche automatiche di strategie.
 
-La ricerca si avvia da terminale (python -m quantlab.discovery), perché è
-lunga e aggiunge tentativi al registro: deve essere una scelta consapevole,
-non un clic. Questa pagina mostra i risultati salvati.
+Una ricerca aggiunge decine di tentativi al registro: per questo il modulo
+chiede una conferma esplicita e un nome nuovo per ogni sessione.
 """
 
 from __future__ import annotations
@@ -13,6 +12,10 @@ import streamlit as st
 from charts import PLOTLY_CONFIG, candidates_chart, color_map, dumbbell_chart, equity_chart
 from styles import card_title, criteria_table, esc, header, verdict_block
 from quantlab.config import HOLDOUT_START
+import re
+
+from presets import SECTOR_UNIVERSE, UNIVERSE
+from quantlab.discovery import DiscoveryConfig, full_space, run_discovery
 from quantlab.discovery.report import load_session
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.metrics import equity_curve
@@ -21,15 +24,75 @@ from quantlab.validation import Check
 registry = ExperimentRegistry()
 names = list(dict.fromkeys(s["name"] for s in registry.discoveries()))
 
+
+def new_search_form(expanded: bool) -> None:
+    """Modulo per avviare una nuova sessione di ricerca."""
+    with st.expander("➕ Nuova ricerca", expanded=expanded):
+        with st.form("nuova_ricerca"):
+            c1, c2, c3, c4 = st.columns([1.4, 1, 1, 1])
+            new_name = c1.text_input("Nome della sessione", value=f"etf_v{len(names) + 1}",
+                                     help="Lettere, numeri e trattini bassi. Ogni sessione è una famiglia "
+                                          "di tentativi separata nel registro.")
+            budget = c2.number_input("Candidate da provare", 10, 300, 60, 10,
+                                     help=f"Estratte a caso tra {len(full_space()):,} combinazioni.")
+            top_k = c3.number_input("Da confermare", 2, 10, 5, 1,
+                                    help="Le migliori sul training passano alla conferma 2017-2022.")
+            seed = c4.number_input("Seme", 0, 9999, 7, 1, help="Rende la scelta casuale riproducibile.")
+            uni = st.multiselect("Universo", list(UNIVERSE), default=SECTOR_UNIVERSE,
+                                 format_func=lambda t: f"{t} · {UNIVERSE[t]}")
+            # Etichetta fissa e chiave stabile: se l'etichetta dipendesse dai valori del modulo,
+            # all'invio Streamlit la tratterebbe come una casella nuova (non spuntata).
+            ok = st.checkbox("Capisco che ogni candidata conta come tentativo: con molte prove la "
+                             "migliore sembrerà buona anche per caso, e la conferma servirà a verificarlo.",
+                             key="discovery_confirm")
+            go = st.form_submit_button("Avvia la ricerca", type="primary")
+        if not go:
+            return
+        problems = []
+        if not ok:
+            problems.append("conferma la casella prima di avviare.")
+        if not re.fullmatch(r"[A-Za-z0-9_]{2,40}", new_name or ""):
+            problems.append("il nome può contenere solo lettere, numeri e _ (da 2 a 40 caratteri).")
+        if new_name in names:
+            problems.append(f"esiste già una sessione {new_name!r}: rilanciarla mescolerebbe i tentativi.")
+        if len(uni) < 2:
+            problems.append("scegli almeno 2 ETF.")
+        if problems:
+            for p_ in problems:
+                st.error(p_)
+            return
+        cfg_ = DiscoveryConfig(name=new_name, universe=tuple(uni), budget=int(budget),
+                               top_k=int(top_k), seed=int(seed))
+        bar = st.progress(0.0, text="Preparo la ricerca…")
+        done = {"n": 0}
+        total = cfg_.budget + cfg_.top_k
+
+        def progress(msg: str) -> None:
+            done["n"] += 1
+            bar.progress(min(done["n"] / total, 1.0), text=msg[:120])
+
+        with st.spinner("Ricerca in corso: ogni candidata è un backtest completo…"):
+            res = run_discovery(cfg_, registry, progress=progress)
+        bar.empty()
+        prom = int((res.confirmed["verdict"] == "PROMOSSA").sum()) if not res.confirmed.empty else 0
+        st.success(f"Sessione {new_name!r} completata: {len(res.search)} candidate → "
+                   f"{len(res.confirmed)} confermate → {prom} promosse.")
+        st.session_state["discovery_session"] = new_name
+        st.rerun()
+
+
 if not names:
     st.html(header("Strategy Discovery", "Ricerca automatica di strategie",
                    "Nessuna sessione ancora eseguita.", [("Holdout bloccato", "lock")]))
-    st.info("Avvia la prima ricerca da terminale:\n\n`python -m quantlab.discovery`\n\n"
-            "Prova 60 combinazioni di regole su 16 ETF e conferma le migliori su dati mai usati.")
+    st.info("Avvia la prima ricerca qui sotto: prova combinazioni di regole su un paniere di ETF "
+            "e conferma le migliori su dati mai usati per sceglierle (circa 1 minuto ogni 60 candidate).")
+    new_search_form(expanded=True)
     st.stop()
 
 with st.sidebar:
-    name = st.selectbox("Sessione", names, help="Ogni sessione è una famiglia di tentativi nel registro.")
+    default = st.session_state.get("discovery_session")
+    name = st.selectbox("Sessione", names, index=names.index(default) if default in names else 0,
+                        help="Ogni sessione è una famiglia di tentativi nel registro.")
 
 data = load_session(registry, name)
 cfg, search, confirmed = data["config"], data["search"], data["confirmed"]
@@ -74,6 +137,8 @@ k[1].metric("Candidate testate", f"{len(search)}", "solo sul training", delta_co
 k[2].metric("Confermate", f"{len(confirmed)}", f"le migliori {cfg['top_k']} con ≥ {cfg['min_trades']} operazioni",
             delta_color="off", border=True)
 k[3].metric("Promosse", f"{promoted}", "superano tutti i criteri", delta_color="off", border=True)
+
+new_search_form(expanded=False)
 
 if confirmed.empty:
     st.warning(f"Nessuna candidata ha raggiunto la conferma (servono almeno {cfg['min_trades']} "

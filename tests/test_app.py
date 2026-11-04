@@ -43,7 +43,7 @@ def synthetic_discovery(db) -> None:
 def test_discovery_page_empty_state():
     at = AppTest.from_file(str(APP_DIR / "page_discovery.py"), default_timeout=60).run()
     assert not at.exception
-    assert any("python -m quantlab.discovery" in i.value for i in at.info)
+    assert any(b.label == "Avvia la ricerca" for b in at.button)   # modulo aperto subito
 
 
 def test_load_session_matches_discovery(temp_registry):
@@ -84,7 +84,7 @@ def test_paper_page_empty_and_with_account(tmp_path, monkeypatch):
     db = tmp_path / "paper.sqlite"
     monkeypatch.setenv("QUANTLAB_PAPER_DB", str(db))
     at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
-    assert not at.exception and any("quantlab.paper create" in i.value for i in at.info)
+    assert not at.exception and any(b.label == "Crea il conto" for b in at.button)
 
     idx = pd.bdate_range("2019-01-01", periods=420)
     rng = np.random.default_rng(0)
@@ -99,3 +99,59 @@ def test_paper_page_empty_and_with_account(tmp_path, monkeypatch):
     at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=60).run()
     assert not at.exception, at.exception
     assert len(at.metric) == 5
+
+
+# --- Azioni dall'interfaccia ---------------------------------------------------------
+
+def _button(at, label):
+    return next(b for b in at.button if b.label == label)
+
+
+def test_data_page_renders_offline():
+    at = AppTest.from_file(str(APP_DIR / "page_data.py"), default_timeout=60).run()
+    assert not at.exception, at.exception
+
+
+def test_discovery_form_rejects_bad_input():
+    at = AppTest.from_file(str(APP_DIR / "page_discovery.py"), default_timeout=60).run()
+    at.text_input[0].set_value("nome con spazi")
+    _button(at, "Avvia la ricerca").click().run()          # casella di conferma non spuntata
+    errors = " ".join(e.value for e in at.error)
+    assert "conferma la casella" in errors and "solo lettere" in errors
+    assert not ExperimentRegistry().discoveries()          # nessuna ricerca partita
+
+
+@pytest.mark.network
+def test_backtesting_page_all_strategies():
+    at = AppTest.from_file(str(APP_DIR / "page_backtesting.py"), default_timeout=300).run()
+    for key in ("momentum", "allocation", "rsi2", "donchian"):
+        at.selectbox[0].set_value(key).run()
+        assert not at.exception, (key, at.exception)
+        assert len(at.metric) == 5
+
+
+@pytest.mark.network
+def test_discovery_form_runs_a_session():
+    at = AppTest.from_file(str(APP_DIR / "page_discovery.py"), default_timeout=300).run()
+    at.text_input[0].set_value("ui_test")
+    at.number_input[0].set_value(10)
+    at.number_input[1].set_value(2)
+    at.multiselect[0].set_value(["SPY", "TLT", "GLD"])
+    at.checkbox[0].check()
+    _button(at, "Avvia la ricerca").click().run()
+    assert not at.exception, at.exception
+    assert ExperimentRegistry().discoveries()[0]["name"] == "ui_test"
+
+
+@pytest.mark.network
+def test_paper_create_and_run_from_ui(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUANTLAB_PAPER_DB", str(tmp_path / "paper.sqlite"))
+    at = AppTest.from_file(str(APP_DIR / "page_paper.py"), default_timeout=300).run()
+    at.text_input[0].set_value("ui_conto")
+    _button(at, "Crea il conto").click().run()
+    assert not at.exception, at.exception
+    from quantlab.paper import PaperStore
+    store = PaperStore(tmp_path / "paper.sqlite")
+    assert store.last_day("ui_conto") is not None
+    _button(at, "Elabora i giorni nuovi").click().run()   # nessun giorno nuovo: non duplica
+    assert not at.exception and len(store.history("ui_conto")) == 1
