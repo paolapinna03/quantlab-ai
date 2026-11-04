@@ -63,7 +63,10 @@ def walk_forward(
     targets = {i: strategy(prices, **p) for i, p in enumerate(param_grid)}
     runs = {i: run_backtest(prices, t, config, cash_returns) for i, t in targets.items()}
 
-    max_lookback = max(int(p.get("lookback", 0)) for p in param_grid)
+    max_lookback = max(int(max(p.get("lookback", 0), p.get("momentum_filter", 0),
+                               max(p.get("horizons", (0,))),
+                               p.get("vol_lookback", 0) if p.get("vol_target", 0) > 0 else 0))
+                       for p in param_grid)
     data_start = warmup_end(prices, max_lookback)
     first_test = data_start + pd.DateOffset(years=train_years)
     last_date = prices.index[-1]

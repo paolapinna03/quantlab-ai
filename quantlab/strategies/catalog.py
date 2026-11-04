@@ -19,6 +19,7 @@ from quantlab.strategies.momentum import time_series_momentum
 from quantlab.strategies.rules import rule_swing, rule_swing_warmup
 from quantlab.strategies.swing import WARMUP as SWING_WARMUP
 from quantlab.strategies.swing import donchian_breakout, rsi2_mean_reversion
+from quantlab.strategies.trend import trend_signals
 
 Strategy = Callable[..., pd.DataFrame]
 
@@ -27,6 +28,7 @@ PORTFOLIO_CATALOG: dict[str, Strategy] = {
     "buy_and_hold": buy_and_hold,
     "time_series_momentum": time_series_momentum,
     "risk_allocation": risk_allocation,
+    "trend_signals": trend_signals,
 }
 
 # Strategie swing: dati OHLC → segnali di ingresso/uscita (motore quantlab.swing).
@@ -56,7 +58,9 @@ def warmup_days(name: str, params: dict) -> int:
         warm = SWING_WARMUP | {"rule_swing": rule_swing_warmup}
         return int(warm[name](full_params(name, params)))
     p = full_params(name, params)
-    return int(max(p.get("lookback", 0), p.get("momentum_filter", 0)))
+    vol = p.get("vol_lookback", 0) if p.get("vol_target", 0) > 0 else 0
+    return int(max(p.get("lookback", 0), p.get("momentum_filter", 0),
+                   max(p.get("horizons", (0,))), vol))
 
 
 def _strategy_params(name: str) -> list[inspect.Parameter]:
