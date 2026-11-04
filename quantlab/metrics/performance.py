@@ -181,11 +181,29 @@ def profit_factor(returns: pd.Series) -> float:
     return float(r[r > 0].sum() / losses)
 
 
-def summarize(
-    returns: pd.Series, risk_free: float = 0.0, periods_per_year: int = TRADING_DAYS
-) -> pd.Series:
-    """Tutte le metriche principali in un'unica tabella."""
+def excess_returns(returns: pd.Series, rf: pd.Series | None) -> pd.Series:
+    """Rendimenti in eccesso rispetto al tasso privo di rischio giornaliero (allineati per data)."""
     r = _clean(returns)
+    if rf is None:
+        return r
+    return r - rf.reindex(r.index).fillna(0.0)
+
+
+def summarize(
+    returns: pd.Series,
+    risk_free: float = 0.0,
+    periods_per_year: int = TRADING_DAYS,
+    rf: pd.Series | None = None,
+) -> pd.Series:
+    """Tutte le metriche principali in un'unica tabella.
+
+    Con `rf` (tasso privo di rischio giornaliero, es. T-bill) Sharpe, errore
+    standard e Sortino sono calcolati sui rendimenti in eccesso, come nella
+    definizione originale; CAGR, volatilità e drawdown restano sui rendimenti totali.
+    """
+    r = _clean(returns)
+    ex = excess_returns(r, rf)
+    sharpe_rf = 0.0 if rf is not None else risk_free
     return pd.Series(
         {
             "start": r.index[0] if not r.empty else None,
@@ -194,9 +212,10 @@ def summarize(
             "total_return": total_return(r),
             "cagr": cagr(r, periods_per_year),
             "volatility": annualized_volatility(r, periods_per_year),
-            "sharpe": sharpe_ratio(r, risk_free, periods_per_year),
-            "sharpe_se": sharpe_standard_error(r, risk_free, periods_per_year),
-            "sortino": sortino_ratio(r, periods_per_year=periods_per_year),
+            "sharpe": sharpe_ratio(ex, sharpe_rf, periods_per_year),
+            "sharpe_se": sharpe_standard_error(ex, sharpe_rf, periods_per_year),
+            "sortino": sortino_ratio(ex, periods_per_year=periods_per_year),
+            "cash_rate": (1 + (r - ex).mean()) ** periods_per_year - 1,
             "max_drawdown": max_drawdown(r),
             "max_dd_duration": max_drawdown_duration(r),
             "calmar": calmar_ratio(r, periods_per_year),

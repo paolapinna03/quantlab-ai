@@ -31,6 +31,7 @@ class ExperimentSpec:
     hypothesis: str = ""
     final_evaluation: bool = False     # True solo per la valutazione sull'holdout
     engine: dict = field(default_factory=dict)  # solo swing: max_positions, sizing, stop a tempo…
+    cash: str = "zero"                 # rendimento della liquidità: "zero" o "tbill"
 
     def __post_init__(self):
         if not self.family.strip():
@@ -61,6 +62,8 @@ class ExperimentSpec:
             d["engine"] = _asdict(SwingConfig(**self.engine)) | {"cost_bps": None}
         elif not self.engine:
             d.pop("engine")  # i run di portafoglio registrati prima del campo restano identici
+        if self.cash == "zero":
+            d.pop("cash")  # i run registrati prima di questa opzione restano identici
         d["universe"] = sorted(d["universe"])
         d["cost_bps"] = float(d["cost_bps"])
         payload = json.dumps(d, sort_keys=True, default=str)

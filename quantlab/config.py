@@ -13,3 +13,9 @@ RESEARCH_END = "2022-12-31"
 # capitale scambiata, in una direzione. Include commissioni, metà dello spread
 # e slippage. Per ETF molto liquidi (SPY, QQQ) è un'ipotesi prudente.
 DEFAULT_COST_BPS = 5.0
+
+# Rendimento della liquidità non investita: "tbill" = T-bill USA a 3 mesi (^IRX),
+# "zero" = nessun rendimento (ipotesi usata nei primi esperimenti).
+# Con "tbill" Sharpe e test statistici usano i rendimenti in eccesso sul T-bill.
+DEFAULT_CASH = "tbill"
+CASH_OPTIONS = ("zero", "tbill")

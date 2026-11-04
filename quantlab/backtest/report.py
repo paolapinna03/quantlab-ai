@@ -13,15 +13,29 @@ from quantlab.backtest.engine import BacktestResult
 from quantlab.metrics import TRADING_DAYS, summarize
 
 
+def excess(result, start=None, end=None) -> pd.Series:
+    """Rendimenti in eccesso sul tasso della liquidità, nella finestra indicata."""
+    window = slice(start, end)
+    r = result.returns.loc[window]
+    rf = getattr(result, "cash_returns", None)
+    return r - (rf.reindex(r.index).fillna(0.0) if rf is not None else 0.0)
+
+
 def evaluate(
     result: BacktestResult,
     start: str | pd.Timestamp | None = None,
     end: str | pd.Timestamp | None = None,
     periods_per_year: int = TRADING_DAYS,
 ) -> pd.Series:
-    """Metriche di performance + turnover, costi ed esposizione media."""
+    """Metriche di performance + turnover, costi ed esposizione media.
+
+    Sharpe e Sortino sono sui rendimenti in eccesso rispetto al tasso della
+    liquidità usato nel backtest (zero se il backtest non ne usava uno).
+    """
     window = slice(start, end)
-    s = summarize(result.returns.loc[window], periods_per_year=periods_per_year)
+    rf = getattr(result, "cash_returns", None)
+    s = summarize(result.returns.loc[window], periods_per_year=periods_per_year,
+                  rf=rf.loc[window] if rf is not None else None)
     years = s["periods"] / periods_per_year
     s["turnover_yr"] = result.turnover.loc[window].sum() / years
     s["cost_yr"] = result.costs.loc[window].sum() / years

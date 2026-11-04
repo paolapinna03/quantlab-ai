@@ -9,8 +9,8 @@ quella data.
 - Una riga con almeno un valore = "ribilancia a questi pesi".
   I NaN dentro una riga attiva valgono 0 (es. asset non ancora quotato).
 - Una riga tutta NaN = "nessuna operazione": i pesi derivano con i prezzi.
-- Peso 1.0 = 100% del capitale; la parte non investita resta in liquidità
-  (rendimento 0, ipotesi semplificativa).
+- Peso 1.0 = 100% del capitale; la parte non investita resta in liquidità,
+  che rende `cash_returns` (es. T-bill) oppure 0 se non specificato.
 
 Tempistica (il punto più delicato di ogni backtest)
 ---------------------------------------------------
@@ -65,6 +65,7 @@ class BacktestResult:
     costs: pd.Series            # costi pagati, in frazione del capitale
     trades: pd.DataFrame        # una riga per ogni variazione di peso
     config: dict = field(default_factory=dict)
+    cash_returns: pd.Series | None = None   # tasso privo di rischio giornaliero usato
 
     def __repr__(self) -> str:
         return (
@@ -77,6 +78,7 @@ def run_backtest(
     prices: pd.DataFrame,
     targets: pd.DataFrame,
     config: BacktestConfig | None = None,
+    cash_returns: pd.Series | None = None,
 ) -> BacktestResult:
     """Simula una strategia a partire dai prezzi di chiusura e dai pesi target.
 
@@ -84,6 +86,7 @@ def run_backtest(
         prices: prezzi di chiusura aggiustati, una colonna per asset.
         targets: pesi desiderati (vedi docstring del modulo).
         config: costi, ritardo di esecuzione, leva massima, capitale iniziale.
+        cash_returns: rendimento giornaliero della liquidità (None = zero).
     """
     config = config or BacktestConfig()
     _check_inputs(prices, targets)
@@ -95,6 +98,9 @@ def run_backtest(
     executed = targets.shift(config.execution_lag)
 
     asset_returns = prices.pct_change().to_numpy()
+    rc_series = (cash_returns.reindex(prices.index).fillna(0.0) if cash_returns is not None
+                 else pd.Series(0.0, index=prices.index))
+    rc = rc_series.to_numpy()
     price_ok = prices.notna().to_numpy()
     tgt = executed.to_numpy()
     cost_rate = config.cost_bps / 10_000
@@ -111,8 +117,9 @@ def run_backtest(
     for i in range(n):
         r = np.nan_to_num(asset_returns[i], nan=0.0)
 
-        # 1. Rendimento lordo con i pesi detenuti da ieri.
-        gross = float(w @ r)
+        # 1. Rendimento lordo con i pesi detenuti da ieri; la liquidità rende il tasso del giorno.
+        cash_w = 1.0 - float(w.sum())
+        gross = float(w @ r) + cash_w * rc[i]
         if 1 + gross <= 0:
             raise RuntimeError(f"capitale azzerato il {prices.index[i].date()}")
 
@@ -155,6 +162,7 @@ def run_backtest(
             trades, columns=["date", "asset", "weight_before", "weight_after", "change"]
         ),
         config=asdict(config),
+        cash_returns=rc_series.rename("cash_return"),
     )
 
 

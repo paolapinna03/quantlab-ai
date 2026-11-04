@@ -28,7 +28,7 @@ Tempistica di ogni giornata t
 3. Alla chiusura: si valuta il portafoglio e si leggono i segnali per domani.
 
 Semplificazioni dichiarate: solo posizioni lunghe, azioni frazionarie,
-liquidità a rendimento zero, nessuna leva.
+nessuna leva. La liquidità rende `cash_returns` (es. T-bill) o zero.
 """
 
 from __future__ import annotations
@@ -84,6 +84,7 @@ class SwingResult:
     trades: pd.DataFrame        # una riga per operazione chiusa
     open_positions: pd.DataFrame
     config: dict = field(default_factory=dict)
+    cash_returns: pd.Series | None = None   # tasso privo di rischio giornaliero usato
 
     def __repr__(self) -> str:
         return (f"SwingResult({self.equity.index[0].date()} → {self.equity.index[-1].date()}, "
@@ -94,12 +95,14 @@ def run_swing_backtest(
     data: dict[str, pd.DataFrame],
     signals: dict[str, pd.DataFrame],
     config: SwingConfig | None = None,
+    cash_returns: pd.Series | None = None,
 ) -> SwingResult:
     """Simula una strategia swing su più asset.
 
     Args:
         data: per ogni asset, OHLC giornaliero (colonne open, high, low, close).
         signals: per ogni asset, segnali con le colonne di SIGNAL_COLUMNS.
+        cash_returns: rendimento giornaliero della liquidità (None = zero).
     """
     config = config or SwingConfig()
     assets = sorted(data)
@@ -117,6 +120,9 @@ def run_swing_backtest(
     o, h, l, c = (field_frames[f].to_numpy() for f in ("open", "high", "low", "close"))
     c_ffill = field_frames["close"].ffill().to_numpy()
     sig = {col: _signal_matrix(signals, assets, dates, col) for col in SIGNAL_COLUMNS}
+    rc_series = (cash_returns.reindex(dates).fillna(0.0) if cash_returns is not None
+                 else pd.Series(0.0, index=dates))
+    rc = rc_series.to_numpy()
 
     cost_rate = config.cost_bps / 10_000
     slip = config.slippage_bps / 10_000
@@ -152,6 +158,7 @@ def run_swing_backtest(
 
     for i in range(n):
         has_bar = ~np.isnan(o[i])
+        cash *= 1 + rc[i]          # la liquidità tenuta da ieri matura il tasso del giorno
 
         # 1a. Uscite all'apertura (segnali di ieri). Un ordine di uscita per una
         # posizione già chiusa (es. dallo stop) viene scartato: non deve colpire
@@ -242,6 +249,7 @@ def run_swing_backtest(
             "pnl", "return", "bars_held", "exit_reason"]),
         open_positions=open_pos,
         config=asdict(config),
+        cash_returns=rc_series.rename("cash_return"),
     )
 
 

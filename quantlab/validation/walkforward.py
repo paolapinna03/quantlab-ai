@@ -25,13 +25,14 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-from quantlab.backtest import BacktestConfig, BacktestResult, run_backtest, warmup_end
+from quantlab.backtest import BacktestConfig, BacktestResult, excess, run_backtest, warmup_end
 from quantlab.metrics import sharpe_ratio
 
 
 @dataclass
 class WalkForwardResult:
     returns: pd.Series          # rendimenti pseudo-OOS (solo finestre di test)
+    excess_returns: pd.Series   # gli stessi, in eccesso sul tasso della liquidità
     folds: pd.DataFrame         # una riga per fold: finestre, parametri scelti, Sharpe
     backtest: BacktestResult    # backtest completo sui pesi cuciti
     param_grid: list[dict]
@@ -45,6 +46,7 @@ def walk_forward(
     test_years: int = 1,
     anchored: bool = True,
     config: BacktestConfig | None = None,
+    cash_returns: pd.Series | None = None,
 ) -> WalkForwardResult:
     """Walk-forward con finestre annuali.
 
@@ -59,7 +61,7 @@ def walk_forward(
     # Ogni combinazione genera i suoi pesi: le strategie sono causali, quindi
     # calcolarle su tutta la storia non usa informazioni future.
     targets = {i: strategy(prices, **p) for i, p in enumerate(param_grid)}
-    runs = {i: run_backtest(prices, t, config) for i, t in targets.items()}
+    runs = {i: run_backtest(prices, t, config, cash_returns) for i, t in targets.items()}
 
     max_lookback = max(int(p.get("lookback", 0)) for p in param_grid)
     data_start = warmup_end(prices, max_lookback)
@@ -75,7 +77,7 @@ def walk_forward(
         train = slice(train_start, test_start - pd.Timedelta(days=1))
         test = slice(test_start, test_end - pd.Timedelta(days=1))
 
-        train_sharpes = {i: sharpe_ratio(r.returns.loc[train]) for i, r in runs.items()}
+        train_sharpes = {i: sharpe_ratio(excess(r, train.start, train.stop)) for i, r in runs.items()}
         best = max(train_sharpes, key=lambda i: (pd.notna(train_sharpes[i]), train_sharpes[i]))
         stitched.loc[test] = targets[best].loc[test]
 
@@ -83,14 +85,14 @@ def walk_forward(
             "train_start": train_start.date(), "train_end": (test_start - pd.Timedelta(days=1)).date(),
             "test_start": test_start.date(), "test_end": (test_end - pd.Timedelta(days=1)).date(),
             "params": param_grid[best], "train_sharpe": train_sharpes[best],
-            "test_sharpe_chosen": sharpe_ratio(runs[best].returns.loc[test]),
+            "test_sharpe_chosen": sharpe_ratio(excess(runs[best], test.start, test.stop)),
         })
         test_start = test_end
 
     if not rows:
         raise ValueError("storia troppo corta per anche un solo fold")
 
-    bt = run_backtest(prices, stitched, config)
+    bt = run_backtest(prices, stitched, config, cash_returns)
     oos = bt.returns.loc[first_test:]
-    return WalkForwardResult(returns=oos, folds=pd.DataFrame(rows), backtest=bt,
-                             param_grid=param_grid)
+    return WalkForwardResult(returns=oos, excess_returns=excess(bt, first_test, None),
+                             folds=pd.DataFrame(rows), backtest=bt, param_grid=param_grid)

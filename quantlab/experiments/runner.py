@@ -17,8 +17,9 @@ from pathlib import Path
 import pandas as pd
 
 from quantlab.backtest import BacktestConfig, BacktestResult, evaluate, run_backtest, warmup_end
-from quantlab.config import HOLDOUT_START
+from quantlab.config import CASH_OPTIONS, HOLDOUT_START
 from quantlab.data import cache_info, load_prices
+from quantlab.data.rates import daily_cash_returns, load_tbill_yield
 from quantlab.experiments.registry import ExperimentRegistry
 from quantlab.experiments.spec import ExperimentSpec
 from quantlab.strategies.catalog import check_params, get_strategy, is_swing, warmup_days
@@ -47,11 +48,13 @@ def run_experiment(
     registry: ExperimentRegistry | None = None,
     prices: pd.DataFrame | None = None,
     ohlc: dict[str, pd.DataFrame] | None = None,
+    tbill_yield: pd.Series | None = None,
 ) -> ExperimentOutcome:
     """Esegue `spec`. Con `registry` il run viene salvato.
 
-    `prices` (chiusure) e `ohlc` (dati completi per le strategie swing) servono ai test:
-    se mancano, i dati vengono caricati fino a `eval_end`.
+    `prices` (chiusure), `ohlc` (dati completi per le strategie swing) e
+    `tbill_yield` (rendimento T-bill in %) servono ai test: se mancano, i dati
+    vengono caricati fino a `eval_end`.
     """
     _validate(spec)
     if spec.final_evaluation and registry is not None:
@@ -66,17 +69,19 @@ def run_experiment(
             data = {t: ohlc[t].loc[: spec.eval_end] for t in spec.universe}
             prices = pd.DataFrame({t: d["close"] for t, d in data.items()})
             data_info = ohlc_fingerprint(data)
+            cash = _cash_returns(spec, prices.index, tbill_yield, data_info)
             signals = get_strategy(spec.strategy)(data, **spec.params)
             result = run_swing_backtest(data, signals,
-                                        SwingConfig(cost_bps=spec.cost_bps, **spec.engine))
+                                        SwingConfig(cost_bps=spec.cost_bps, **spec.engine), cash)
         else:
             if prices is None:
                 prices = load_closes(spec.universe, end=spec.eval_end)
             prices = prices.loc[: spec.eval_end, list(spec.universe)]
             data_info = data_fingerprint(prices)
+            cash = _cash_returns(spec, prices.index, tbill_yield, data_info)
             targets = get_strategy(spec.strategy)(prices, **spec.params)
             cfg = BacktestConfig(cost_bps=spec.cost_bps, execution_lag=spec.execution_lag)
-            result = run_backtest(prices, targets, cfg)
+            result = run_backtest(prices, targets, cfg, cash)
 
         start = pd.Timestamp(spec.eval_start) if spec.eval_start else _default_start(spec, prices)
         end = min(pd.Timestamp(spec.eval_end), prices.index[-1])
@@ -102,8 +107,22 @@ def run_experiment(
     return ExperimentOutcome(spec, result, metrics, start, end, run_id, trials)
 
 
+def _cash_returns(spec, index, tbill_yield, data_info) -> pd.Series | None:
+    """Rendimento giornaliero della liquidità secondo `spec.cash` (None = zero)."""
+    if spec.cash != "tbill":
+        return None
+    y = tbill_yield if tbill_yield is not None else load_tbill_yield(end=spec.eval_end)
+    y = y.loc[: spec.eval_end]
+    digest = hashlib.sha256(pd.util.hash_pandas_object(y, index=True).values.tobytes())
+    data_info["^IRX"] = {"sha256": digest.hexdigest()[:16], "rows": len(y),
+                         "last": str(y.index[-1].date()) if len(y) else None}
+    return daily_cash_returns(y, index)
+
+
 def _validate(spec: ExperimentSpec) -> None:
     check_params(spec.strategy, spec.params)
+    if spec.cash not in CASH_OPTIONS:
+        raise ValueError(f"cash deve essere uno tra {CASH_OPTIONS}")
     if is_swing(spec.strategy):
         if spec.execution_lag != 1:
             raise ValueError("le strategie swing eseguono sempre all'apertura del giorno dopo")

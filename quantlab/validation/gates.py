@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field, replace
 import numpy as np
 import pandas as pd
 
-from quantlab.backtest import BacktestConfig
+from quantlab.backtest import BacktestConfig, excess
 from quantlab.experiments import ExperimentRegistry, ExperimentSpec, run_experiment
 from quantlab.experiments.runner import load_closes
 from quantlab.metrics import sharpe_ratio
@@ -84,10 +84,12 @@ def validate_candidate(
         prices = pd.DataFrame({t: d["close"] for t, d in ohlc.items()})
     cand = run_experiment(spec, registry, prices=prices, ohlc=ohlc)
     start = str(cand.eval_start.date())
-    bench = run_experiment(replace(benchmark, eval_start=start, eval_end=spec.eval_end),
-                           prices=prices)
-    r = cand.result.returns.loc[cand.eval_start:cand.eval_end]
-    rb = bench.result.returns.loc[cand.eval_start:cand.eval_end]
+    # Il benchmark usa sempre la stessa ipotesi sulla liquidità della candidata.
+    bench = run_experiment(replace(benchmark, eval_start=start, eval_end=spec.eval_end,
+                                   cash=spec.cash), prices=prices)
+    # Rendimenti in eccesso sul tasso della liquidità: base di tutti i test statistici.
+    r = excess(cand.result, cand.eval_start, cand.eval_end)
+    rb = excess(bench.result, cand.eval_start, cand.eval_end)
     checks: list[Check] = []
     details: dict = {"run_id": cand.run_id, "metrics": cand.metrics, "benchmark": bench.metrics}
 
@@ -118,8 +120,9 @@ def validate_candidate(
         wf = walk_forward(
             p.loc[: spec.eval_end, list(spec.universe)], get_strategy(spec.strategy), param_grid,
             config=BacktestConfig(cost_bps=spec.cost_bps, execution_lag=spec.execution_lag),
+            cash_returns=cand.result.cash_returns,
         )
-        wf_sharpe = sharpe_ratio(wf.returns)
+        wf_sharpe = sharpe_ratio(wf.excess_returns)
         details["walk_forward"] = wf
         checks.append(Check(
             "Walk-forward", wf_sharpe, f"> {criteria.min_walk_forward_sharpe}",
