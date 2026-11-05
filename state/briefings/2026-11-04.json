@@ -1,0 +1,219 @@
+{
+  "fatti": {
+    "data": "2026-11-04",
+    "prossimo_ribilanciamento_strategie": "2026-11-30",
+    "tasso_tbill_annuo": 0.0403,
+    "segnali": {
+      "SPY": {
+        "nome": "azioni USA",
+        "rend_12m": 0.1343,
+        "rend_1g": 0.0165,
+        "rend_1m": -0.0158,
+        "vol_3m": 0.104,
+        "trend": "positivo",
+        "prezzo": 766.81
+      },
+      "EFA": {
+        "nome": "azioni sviluppate ex-USA",
+        "rend_12m": 0.1567,
+        "rend_1g": 0.0256,
+        "rend_1m": 0.0144,
+        "vol_3m": 0.1205,
+        "trend": "positivo",
+        "prezzo": 105.72
+      },
+      "EEM": {
+        "nome": "azioni emergenti",
+        "rend_12m": 0.129,
+        "rend_1g": 0.0085,
+        "rend_1m": -0.0974,
+        "vol_3m": 0.2034,
+        "trend": "positivo",
+        "prezzo": 61.62
+      },
+      "IWM": {
+        "nome": "small cap USA",
+        "rend_12m": 0.1689,
+        "rend_1g": 0.0151,
+        "rend_1m": 0.0095,
+        "vol_3m": 0.135,
+        "trend": "positivo",
+        "prezzo": 284.02
+      },
+      "TLT": {
+        "nome": "Treasury USA 20+ anni",
+        "rend_12m": -0.0539,
+        "rend_1g": 0.008,
+        "rend_1m": 0.058,
+        "vol_3m": 0.1087,
+        "trend": "negativo",
+        "prezzo": 81.76
+      },
+      "IEF": {
+        "nome": "Treasury USA 7-10 anni",
+        "rend_12m": -0.0187,
+        "rend_1g": 0.0055,
+        "rend_1m": 0.0284,
+        "vol_3m": 0.0583,
+        "trend": "negativo",
+        "prezzo": 91.66
+      },
+      "GLD": {
+        "nome": "oro",
+        "rend_12m": 0.0101,
+        "rend_1g": 0.0368,
+        "rend_1m": -0.0256,
+        "vol_3m": 0.2459,
+        "trend": "positivo",
+        "prezzo": 372.49
+      },
+      "DBC": {
+        "nome": "materie prime",
+        "rend_12m": 0.4032,
+        "rend_1g": -0.0354,
+        "rend_1m": -0.0428,
+        "vol_3m": 0.1972,
+        "trend": "positivo",
+        "prezzo": 31.29
+      },
+      "VNQ": {
+        "nome": "immobiliare USA",
+        "rend_12m": 0.1425,
+        "rend_1g": 0.0318,
+        "rend_1m": 0.0901,
+        "vol_3m": 0.1475,
+        "trend": "positivo",
+        "prezzo": 98.03
+      }
+    },
+    "conti": [
+      {
+        "conto": "rp_momentum",
+        "strategia": "Risk parity + momentum 12 mesi (9 ETF multi-asset)",
+        "stato": "attivo",
+        "data": "2026-11-04",
+        "valore": 9998.79,
+        "rendimento_da_avvio": -0.0001,
+        "drawdown": -0.0001,
+        "liquidita": 0.4458,
+        "posizioni": {
+          "SPY": 0.0899,
+          "EFA": 0.0662,
+          "EEM": 0.0472,
+          "IWM": 0.0607,
+          "DBC": 0.1759,
+          "VNQ": 0.1143
+        },
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "tsmom_9etf",
+        "strategia": "Momentum 12 mesi, pesi uguali (stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-04",
+        "valore": 9998.23,
+        "rendimento_da_avvio": -0.0002,
+        "drawdown": -0.0002,
+        "liquidita": 0.3333,
+        "posizioni": {
+          "SPY": 0.1111,
+          "EFA": 0.1111,
+          "EEM": 0.1111,
+          "IWM": 0.1111,
+          "DBC": 0.1111,
+          "VNQ": 0.1111
+        },
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "ai_analyst",
+        "strategia": "Idee dell'analista AI (esperimento, stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-04",
+        "valore": 10001.57,
+        "rendimento_da_avvio": 0.0002,
+        "drawdown": 0.0,
+        "liquidita": 1.0,
+        "posizioni": {},
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "trend_multi",
+        "strategia": "Trend su più orizzonti 1-3-6-12 mesi (stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-04",
+        "valore": 10000.0,
+        "rendimento_da_avvio": 0.0,
+        "drawdown": 0.0,
+        "liquidita": 1.0,
+        "posizioni": {},
+        "ordini_prossima_chiusura": [
+          {
+            "etf": "DBC",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.1111,
+            "controvalore": 1111.11
+          },
+          {
+            "etf": "EEM",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0278,
+            "controvalore": 277.78
+          },
+          {
+            "etf": "EFA",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0833,
+            "controvalore": 833.33
+          },
+          {
+            "etf": "IEF",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0278,
+            "controvalore": 277.78
+          },
+          {
+            "etf": "IWM",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0833,
+            "controvalore": 833.33
+          },
+          {
+            "etf": "SPY",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0556,
+            "controvalore": 555.56
+          },
+          {
+            "etf": "TLT",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0278,
+            "controvalore": 277.78
+          },
+          {
+            "etf": "VNQ",
+            "azione": "compra",
+            "peso_da": 0.0,
+            "peso_a": 0.0556,
+            "controvalore": 555.56
+          }
+        ],
+        "eventi_oggi": [
+          "allocazione_iniziale: si parte con i pesi dell'ultimo ribilanciamento (2026-10-30), eseguiti alla prossima chiusura"
+        ]
+      }
+    ]
+  },
+  "ai": null,
+  "idee_applicate": false
+}
