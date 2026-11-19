@@ -1,0 +1,169 @@
+{
+  "fatti": {
+    "data": "2026-11-18",
+    "prossimo_ribilanciamento_strategie": "2026-11-30",
+    "tasso_tbill_annuo": 0.0414,
+    "segnali": {
+      "SPY": {
+        "nome": "azioni USA",
+        "rend_12m": 0.1088,
+        "rend_1g": -0.0031,
+        "rend_1m": -0.0505,
+        "vol_3m": 0.1508,
+        "trend": "positivo",
+        "prezzo": 730.2
+      },
+      "EFA": {
+        "nome": "azioni sviluppate ex-USA",
+        "rend_12m": 0.1029,
+        "rend_1g": -0.0108,
+        "rend_1m": -0.0331,
+        "vol_3m": 0.1503,
+        "trend": "positivo",
+        "prezzo": 100.26
+      },
+      "EEM": {
+        "nome": "azioni emergenti",
+        "rend_12m": 0.0866,
+        "rend_1g": -0.0067,
+        "rend_1m": -0.0859,
+        "vol_3m": 0.2481,
+        "trend": "positivo",
+        "prezzo": 57.88
+      },
+      "IWM": {
+        "nome": "small cap USA",
+        "rend_12m": 0.1723,
+        "rend_1g": 0.004,
+        "rend_1m": -0.0205,
+        "vol_3m": 0.1796,
+        "trend": "positivo",
+        "prezzo": 270.12
+      },
+      "TLT": {
+        "nome": "Treasury USA 20+ anni",
+        "rend_12m": -0.0572,
+        "rend_1g": 0.0084,
+        "rend_1m": 0.0053,
+        "vol_3m": 0.1071,
+        "trend": "negativo",
+        "prezzo": 80.22
+      },
+      "IEF": {
+        "nome": "Treasury USA 7-10 anni",
+        "rend_12m": -0.0231,
+        "rend_1g": 0.0029,
+        "rend_1m": 0.0081,
+        "vol_3m": 0.061,
+        "trend": "negativo",
+        "prezzo": 90.67
+      },
+      "GLD": {
+        "nome": "oro",
+        "rend_12m": -0.082,
+        "rend_1g": -0.032,
+        "rend_1m": -0.0965,
+        "vol_3m": 0.2443,
+        "trend": "negativo",
+        "prezzo": 341.19
+      },
+      "DBC": {
+        "nome": "materie prime",
+        "rend_12m": 0.3297,
+        "rend_1g": -0.0225,
+        "rend_1m": -0.1209,
+        "vol_3m": 0.19,
+        "trend": "positivo",
+        "prezzo": 29.51
+      },
+      "VNQ": {
+        "nome": "immobiliare USA",
+        "rend_12m": 0.1118,
+        "rend_1g": 0.0031,
+        "rend_1m": 0.0314,
+        "vol_3m": 0.1497,
+        "trend": "positivo",
+        "prezzo": 95.18
+      }
+    },
+    "conti": [
+      {
+        "conto": "rp_momentum",
+        "strategia": "Risk parity + momentum 12 mesi (9 ETF multi-asset)",
+        "stato": "attivo",
+        "data": "2026-11-18",
+        "valore": 9737.17,
+        "rendimento_da_avvio": -0.0263,
+        "drawdown": -0.0263,
+        "liquidita": 0.4585,
+        "posizioni": {
+          "SPY": 0.088,
+          "EFA": 0.0645,
+          "EEM": 0.0455,
+          "IWM": 0.0592,
+          "DBC": 0.1703,
+          "VNQ": 0.114
+        },
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "tsmom_9etf",
+        "strategia": "Momentum 12 mesi, pesi uguali (stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-18",
+        "valore": 9675.82,
+        "rendimento_da_avvio": -0.0324,
+        "drawdown": -0.0324,
+        "liquidita": 0.345,
+        "posizioni": {
+          "SPY": 0.1093,
+          "EFA": 0.1089,
+          "EEM": 0.1078,
+          "IWM": 0.1092,
+          "DBC": 0.1083,
+          "VNQ": 0.1115
+        },
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "ai_analyst",
+        "strategia": "Idee dell'analista AI (esperimento, stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-18",
+        "valore": 10017.45,
+        "rendimento_da_avvio": 0.0017,
+        "drawdown": 0.0,
+        "liquidita": 1.0,
+        "posizioni": {},
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      },
+      {
+        "conto": "trend_multi",
+        "strategia": "Trend su più orizzonti 1-3-6-12 mesi (stessi 9 ETF)",
+        "stato": "attivo",
+        "data": "2026-11-18",
+        "valore": 9896.4,
+        "rendimento_da_avvio": -0.0104,
+        "drawdown": -0.0175,
+        "liquidita": 0.534,
+        "posizioni": {
+          "SPY": 0.0559,
+          "EFA": 0.0822,
+          "EEM": 0.028,
+          "IWM": 0.0839,
+          "TLT": 0.0275,
+          "IEF": 0.0277,
+          "DBC": 0.1053,
+          "VNQ": 0.0555
+        },
+        "ordini_prossima_chiusura": [],
+        "eventi_oggi": []
+      }
+    ]
+  },
+  "ai": null,
+  "idee_applicate": false
+}
