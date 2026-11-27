@@ -2,7 +2,7 @@
   "fatti": {
     "data": "2026-11-25",
     "prossimo_ribilanciamento_strategie": "2026-11-30",
-    "tasso_tbill_annuo": 0.0415,
+    "tasso_tbill_annuo": 0.0416,
     "segnali": {
       "SPY": {
         "nome": "azioni USA",
